@@ -2,6 +2,7 @@
 #ifndef BPLUS_C
 #define BPLUS_C
 
+#include <algorithm>
 #include "MyDB_INRecord.h"
 #include "MyDB_BPlusTreeReaderWriter.h"
 #include "MyDB_PageReaderWriter.h"

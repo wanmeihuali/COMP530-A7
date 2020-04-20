@@ -7,6 +7,7 @@
 #include <climits>
 #include <memory>
 #include <string>
+#include <cstring>
 
 // create a smart pointer for database tables
 using namespace std;
