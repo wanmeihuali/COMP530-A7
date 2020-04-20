@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/Main/BufferMgr/headers",
+                "${workspaceFolder}/Main/Catalog/headers",
+                "${workspaceFolder}/Main/DatabaseTable/headers",
+                "${workspaceFolder}/Main/Qunit/headers",
+                "${workspaceFolder}/Main/Record/headers",
+                "${workspaceFolder}/Main/RelOps/headers",
+                "${workspaceFolder}/Main/SQL/headers"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-x64"
+        }
+    ],
+    "version": 4
+}
