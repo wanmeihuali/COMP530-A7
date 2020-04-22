@@ -116,5 +116,11 @@ std::ostream& operator<<(std::ostream& os, const MyDB_SchemaPtr printMe) {
         return os;
 }
 
+void MyDB_Schema :: addPrefix(string prefix) {
+	for (auto& att_pair: allAtts) {
+		att_pair.first = prefix + "_" + att_pair.first;
+	}
+}
+
 #endif
 

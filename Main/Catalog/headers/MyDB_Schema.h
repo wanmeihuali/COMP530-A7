@@ -33,6 +33,9 @@ public:
 	// add to the catalog
 	void putInCatalog (string TableName, MyDB_CatalogPtr toMe);
 
+	// change the name of each attribute from atts to prefix_atts
+	void addPrefix(string prefix);
+
 	// to print out the the screen
 	friend std::ostream& operator<<(std::ostream& os, const MyDB_Schema printMe);
 	friend std::ostream& operator<<(std::ostream& os, const MyDB_SchemaPtr printMe);

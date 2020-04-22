@@ -10,6 +10,9 @@
 #include "MyDB_Table.h"
 #include <string>
 #include <utility>
+#include "RelAlgebra.h"
+#include <memory>
+#include "MyDB_TableReaderWriter.h"
 
 using namespace std;
 
@@ -156,6 +159,7 @@ public:
 	~CreateTable () {}
 
 	#include "FriendDecls.h"
+
 };
 
 // structure that stores a list of attributes
@@ -255,6 +259,71 @@ public:
 	}
 
 	#include "FriendDecls.h"
+
+	/*
+	select 
+			l.l_comment
+	from 
+			lineitem as l
+	where
+			(l.l_shipdate = "1994-05-12") and
+			(l.l_commitdate = "1994-05-22") and
+			(l.l_receiptdate = "1994-06-10");
+
+	l->lineitem
+	
+	RegularSelection:
+	MyDB_TableReaderWriterPtr input, MyDB_TableReaderWriterPtr output,
+		string selectionPredicate, vector <string> projections
+
+	selectionPredicate: (l.l_shipdate = "1994-05-12") and
+			(l.l_commitdate = "1994-05-22") and
+			(l.l_receiptdate = "1994-06-10");
+
+	toString:
+			== ([l_l_shipdate], string[1994-05-12])
+			== ([l_l_commitdate], string[1994-05-22])
+			== ([l_l_receiptdate], string[1994-06-10])
+
+	TargetVersion:
+			"|| ( == ([l_nationkey], int[3]), == ([l_nationkey], int[4]))"
+			not right == ([l_shipdate], string[1994-05-12])
+			lineitem: l_shipdate, l_commitdate...
+			->lineitem: l_l_shipdate, l_l_commitdate
+			== ([l_l_shipdate], string[1994-05-12])
+	*/
+
+	// find the full tableName from the shortName
+	string getTableName(string shortName) {
+		for (auto& namePair: tablesToProcess) {
+			if (namePair.second == shortName) {
+				return namePair.first;
+			}
+		}
+		return ""; // table do not exist
+	}
+
+	std::shared_ptr<RelAlgebra> toRelAgebra(MyDB_CatalogPtr catelog, MyDB_BufferManagerPtr bufferMgr) {
+    if (groupingClauses.size() == 0 && tablesToProcess.size() == 1) {
+		// SFWQuery trans to RelAlgebra, only one selection from a single table
+		auto all_tables = MyDB_Table :: getAllTables(catelog);
+		string table_name = tablesToProcess[0].first;
+		string table_alias = tablesToProcess[0].second;
+		auto ori_input_table = std::make_shared<MyDB_TableReaderWriter>(all_tables[table_name], bufferMgr);
+		auto input_table_copy = std::make_shared<MyDB_TableReaderWriter>(ori_input_table);
+		
+		input_table_copy->getTable()->getSchema()->addPrefix(table_alias);
+
+		//Q: the result of selection might not have a name
+		//Q: name of the output table
+		
+
+		
+
+		return nullptr;
+	}
+	
+}
 };
 
 // structure that sores an entire SQL statement
