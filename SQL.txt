@@ -1,0 +1,183 @@
+1.
+select 
+	l.l_comment
+from 
+	lineitem as l
+where
+	(l.l_shipdate = "1994-05-12") and
+	(l.l_commitdate = "1994-05-22") and
+	(l.l_receiptdate = "1994-06-10");
+
+
+2.
+select 
+	l.l_orderkey
+from
+	lineitem as l
+where
+	(l.l_shipinstruct = "TAKE BACK RETURN") and
+	(l.l_extendedprice / l.l_quantity > 1759.6) and
+	(l.l_extendedprice / l.l_quantity < 1759.8);
+
+
+3.
+select 
+	sum (1), 
+	avg ((o.o_totalprice - 32592.14) / 32592.14)
+from
+	orders as o
+where
+	(o.o_orderstatus = "F") and 
+	(o.o_orderpriority < "2-HIGH" or o.o_orderpriority = "2-HIGH");
+
+
+4.
+select 
+	avg (o.o_totalprice),
+	"order priority was " + o.o_orderpriority
+from
+	orders as o
+where
+	(o.o_orderstatus = "F")
+group by
+	o.o_orderpriority;
+
+5. 
+select
+	"return flag was " + l.l_returnflag,
+	sum (l.l_quantity),
+	sum (l.l_extendedprice),
+	sum (l.l_extendedprice*(1-l.l_discount)),
+	sum (l.l_extendedprice*(1-l.l_discount)*(1+l.l_tax)),
+	avg (l.l_quantity),
+	avg (l.l_extendedprice),
+	avg (l.l_discount),
+	sum (1)
+from
+	lineitem as l
+where
+	(l.l_shipdate < "1998-12-01") and
+        (l.l_shipdate > "1998-06-01")
+group by
+	l.l_returnflag;
+
+
+6.
+select
+	l.l_shipmode,
+	sum (1)
+from
+	orders as o,
+	lineitem as l
+where
+	(o.o_orderkey = l.l_orderkey)
+	and (o.o_orderstatus = "F")
+	and (l.l_shipmode = "truck" or l.l_shipmode = "rail")
+	and (l.l_commitdate < l.l_receiptdate)
+	and (l.l_shipdate < l.l_commitdate)
+	and (l.l_receiptdate > "1996-06-20" or l.l_receiptdate = "1996-06-20")
+	and (l.l_receiptdate < "1997-06-20" or l.l_receiptdate = "1997-06-20")
+group by
+	l.l_shipmode;
+
+
+
+7.
+select
+	ps.ps_partkey, 
+	avg (ps.ps_supplycost)
+from
+	part as p,
+	partsupp as ps,
+	supplier as s,
+	nation as n,
+	region as r
+where
+	(p.p_partkey = ps.ps_partkey)
+	and (s.s_suppkey = ps.ps_suppkey)
+	and (s.s_nationkey = n.n_nationkey)
+	and (n.n_regionkey = r.r_regionkey)
+	and (r.r_name = "AMERICA")
+group by
+	ps.ps_partkey;
+
+
+8.
+select
+	n.n_name,
+	o.o_orderdate,
+	l.l_extendedprice * (1 - l.l_discount) - ps.ps_supplycost * l.l_quantity 
+from
+	part as p,
+	supplier as s,
+	lineitem as l,
+	partsupp as ps,
+	orders as o,
+	nation as n
+where
+	(s.s_suppkey = l.l_suppkey)
+	and (ps.ps_suppkey = l.l_suppkey)
+	and (ps.ps_partkey = l.l_partkey)
+	and (p.p_partkey = l.l_partkey)
+	and (o.o_orderkey = l.l_orderkey)
+	and (s.s_nationkey = n.n_nationkey)
+	and (p.p_type = "STANDARD POLISHED TIN" or
+	     p.p_type = "ECONOMY BRUSHED TIN" or
+	     p.p_type = "ECONOMY POLISHED NICKEL" or
+	     p.p_type = "SMALL ANODIZED COPPER");
+
+
+
+9.
+select
+	"supplier name was " + s.s_name,
+	sum (1) 
+from
+	supplier as s,
+	lineitem as l1,
+	lineitem as l2,
+	orders as o,
+	nation as n
+where
+	(s.s_suppkey = l1.l_suppkey)
+	and (o.o_orderkey = l1.l_orderkey)
+	and (o.o_orderstatus = "F")
+	and (l1.l_receiptdate > l1.l_commitdate)
+	and (l2.l_orderkey = l1.l_orderkey)
+	and (not l2.l_suppkey = l1.l_suppkey)
+group by
+	s.s_name;
+
+
+10.
+select
+	"date was " + o.o_orderdate,
+	avg (l.l_extendedprice * (1-l.l_discount))
+from
+	part as p,
+	supplier as s,
+	lineitem as l,
+	orders as o,
+	customer as c,
+	nation as n1,
+	nation as n2,
+	region as r1,
+	region as r2
+where
+	(p.p_partkey = l.l_partkey)
+	and (s.s_suppkey = l.l_suppkey)
+	and (l.l_orderkey = o.o_orderkey)
+	and (o.o_custkey = c.c_custkey)
+	and (c.c_nationkey = n1.n_nationkey)
+	and (n1.n_regionkey = r1.r_regionkey)
+	and (r1.r_name = "AMERICA")
+	and (n2.n_regionkey = r2.r_regionkey)
+	and (r2.r_name = "MIDDLE EAST")
+	and (s.s_nationkey = n2.n_nationkey)
+	and (o.o_orderdate > "1995-01-01" or o.o_orderdate = "1995-01-01")
+	and (o.o_orderdate < "1996-12-31" or o.o_orderdate = "1996-12-31")
+	and (p.p_type = "ECONOMY ANODIZED STEEL")
+group by
+	o.o_orderdate;
+
+
