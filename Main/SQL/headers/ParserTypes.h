@@ -13,6 +13,7 @@
 #include "RelAlgebra.h"
 #include <memory>
 #include "MyDB_TableReaderWriter.h"
+#include "RegularSelection.h"
 
 using namespace std;
 
@@ -303,6 +304,45 @@ public:
 		return ""; // table do not exist
 	}
 
+
+	bool isValid(MyDB_CatalogPtr catalog) {
+		auto tableNameGetter = [this](string shortName){
+			return this->getTableName(shortName);
+		};
+		for (auto& expr: valuesToSelect) {
+			if (expr->getType(catalog, tableNameGetter) == nullptr) {
+				return false;
+			}
+		}
+		for (auto& expr: allDisjunctions) {
+			if (expr->getType(catalog, tableNameGetter) == nullptr) {
+				return false;
+			}
+		}
+		for (auto& expr: groupingClauses) {
+			if (expr->getType(catalog, tableNameGetter) == nullptr) {
+				return false;
+			}
+		}
+
+		for (auto& selectExpr: valuesToSelect) {
+			auto selectStr = selectExpr->toString();
+			if (selectStr.substr(0, 3) != "sum" && selectStr.substr(0, 3) != "avg") {
+				for (auto& groupExpr: groupingClauses) {
+					auto groupStr = groupExpr->toString();
+					if (groupStr == selectStr) {
+						break;
+					}
+					std::cout << "Error: the only selected attributes must be functions of the grouping attributes! " << selectStr << "not found" << std::endl;
+					return false;
+				}
+			}
+		}
+		
+		// TO DO: check if all tables in tablesToProcess exist
+		return true;
+	}
+
 	std::shared_ptr<RelAlgebra> toRelAgebra(MyDB_CatalogPtr catelog, MyDB_BufferManagerPtr bufferMgr) {
     if (groupingClauses.size() == 0 && tablesToProcess.size() == 1) {
 		// SFWQuery trans to RelAlgebra, only one selection from a single table
@@ -312,13 +352,46 @@ public:
 		auto ori_input_table = std::make_shared<MyDB_TableReaderWriter>(all_tables[table_name], bufferMgr);
 		auto input_table_copy = std::make_shared<MyDB_TableReaderWriter>(ori_input_table);
 		
+		// modify the attributes in the copied input table
 		input_table_copy->getTable()->getSchema()->addPrefix(table_alias);
 
 		//Q: the result of selection might not have a name
-		//Q: name of the output table
+		//Q: att name of the output table
+		auto tableNameGetter = [this](string shortName){
+			return this->getTableName(shortName);
+		};
 		
+		// generate the projections and the schema for the output table
+		vector<string> projections;
+		MyDB_SchemaPtr output_schema = make_shared<MyDB_Schema>();
+		for (auto& value_to_select : valuesToSelect) {
+			projections.push_back(value_to_select->toString());
+			output_schema->appendAtt(make_pair(value_to_select->toString(), value_to_select->getType(catelog, tableNameGetter)));
+		}
 
-		
+		//generate the output table based on the output_schema
+		// generate a temp talbe with as our output table
+		auto output_tablePtr = std::make_shared<MyDB_TableReaderWriter>(std::make_shared<MyDB_Table>("temp", "temp", output_schema), bufferMgr);
+
+		// generate the electionPredicate
+		string selectionPredicate = "";
+		for (auto& disjunction : allDisjunctions) {
+			selectionPredicate = "&& (" + disjunction->toString() + ", " + selectionPredicate + ")";
+		}
+
+		// use the selection in Assignment 6 (RegularSelection)
+		RegularSelection regularSelect(input_table_copy, output_tablePtr, selectionPredicate, projections);
+
+		regularSelect.run();
+
+
+		MyDB_RecordPtr tempRec = output_tablePtr->getEmptyRecord();
+		MyDB_RecordIteratorAltPtr myIter = output_tablePtr->getIteratorAlt();
+
+		while (myIter->advance()) {
+			myIter->getCurrent(tempRec);
+			cout << tempRec << "\n";
+		}
 
 		return nullptr;
 	}
@@ -366,6 +439,14 @@ public:
 	
 	void printSFWQuery () {
 		myQuery.print ();
+	}
+
+	bool isSFWValid(MyDB_CatalogPtr catalog) {
+		return myQuery.isValid(catalog);
+	}
+
+	void executeSFWQuery(MyDB_CatalogPtr catelog, MyDB_BufferManagerPtr bufferMgr) {
+		myQuery.toRelAgebra(catelog, bufferMgr);
 	}
 
 	#include "FriendDecls.h"

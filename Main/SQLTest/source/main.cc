@@ -163,7 +163,11 @@ int main (int numArgs, char **args) {
 					} else if (final->isSFWQuery ()) {
 
 						// print it out
-						final->printSFWQuery ();
+						if (final->isSFWValid(myCatalog)) {
+							// print it out
+							final->printSFWQuery ();
+							final->executeSFWQuery(myCatalog, myMgr);
+						}
 					}
 
 					// get outta here

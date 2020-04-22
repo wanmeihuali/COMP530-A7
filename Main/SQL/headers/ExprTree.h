@@ -3,8 +3,11 @@
 #define SQL_EXPRESSIONS
 
 #include "MyDB_AttType.h"
+#include "MyDB_Table.h"
+#include "MyDB_Catalog.h"
 #include <string>
 #include <vector>
+#include <functional>
 
 // create a smart pointer for database tables
 using namespace std;
@@ -19,6 +22,7 @@ class ExprTree {
 public:
 	virtual string toString () = 0;
 	virtual ~ExprTree () {}
+	virtual MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) = 0;
 };
 
 class BoolLiteral : public ExprTree {
@@ -37,7 +41,14 @@ public:
 		} else {
 			return "bool[false]";
 		}
-	}	
+	}
+
+	// return a ptr point to boolAttType
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		return make_shared <MyDB_BoolAttType>();
+	}
+
+	~BoolLiteral () {}
 };
 
 class DoubleLiteral : public ExprTree {
@@ -53,6 +64,11 @@ public:
 	string toString () {
 		return "double[" + to_string (myVal) + "]";
 	}	
+	
+	// return a ptr point to doubleAttType
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		return make_shared <MyDB_DoubleAttType>();
+	}
 
 	~DoubleLiteral () {}
 };
@@ -70,6 +86,11 @@ public:
 
 	string toString () {
 		return "int[" + to_string (myVal) + "]";
+	}
+	
+	// return a ptr point to IntAttType
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		return make_shared <MyDB_IntAttType> ();
 	}
 
 	~IntLiteral () {}
@@ -90,6 +111,11 @@ public:
 		return "string[" + myVal + "]";
 	}
 
+	// return a ptr point to StringAttType
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		return make_shared <MyDB_StringAttType> ();
+	}
+
 	~StringLiteral () {}
 };
 
@@ -106,8 +132,27 @@ public:
 	}
 
 	string toString () {
+		// customer AS c, c_namtionkey->c_c_nationkey
 		return "[" + tableName + "_" + attName + "]";
 	}	
+
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		/*
+			inputs: catalog and a function that can get the full tableName;
+			outputs: type of the current indentifier
+		*/
+		MyDB_Table table;
+		// tableName is abbreviation, use tableNameGetter to get the full-name
+		if (!table.fromCatalog(tableNameGetter(tableName), catalog)) {
+			std::cout << "Error: referring to table that does not exist!" << std::endl;
+			return nullptr;
+		}
+		auto attType = table.getSchema()->getAttByName(attName).second;
+		if (attType == nullptr) {
+			std::cout << "Error: referring to attribute that does not exist in table" << std::endl;
+		}
+		return attType;
+	} 
 
 	~Identifier () {}
 };
@@ -130,6 +175,23 @@ public:
 		return "- (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+
+		if (ltype->promotableToInt() && rtype->promotableToInt()) {
+			return ltype;
+		}
+		if (ltype->promotableToDouble() && rtype->promotableToDouble()) {
+			return make_shared <MyDB_DoubleAttType>();
+		}
+		std::cout << "Error: MinusOp type mismatch!" << std::endl;
+		return nullptr;
+	}
+
 	~MinusOp () {}
 };
 
@@ -150,6 +212,36 @@ public:
 	string toString () {
 		return "+ (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
+
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+		/*
+		if (ltype->isBool() && rtype->isBool()) {
+			return ltype;
+		} else if (ltype->isBool() || rtype->isBool()) {
+			return nullptr;
+		}
+		*/
+		if (ltype->isBool() || rtype->isBool()) {
+			std::cout << "Error: PlusOp type mismatch! Both ltype and rtype are bool!" << std::endl;
+			return nullptr;
+		}
+		if (ltype->promotableToInt() && rtype->promotableToInt()) {
+			return ltype;
+		}
+		if (ltype->promotableToDouble() && rtype->promotableToDouble()) {
+			return make_shared <MyDB_DoubleAttType>();
+		}
+		if (ltype->promotableToDouble() || rtype->promotableToDouble()) {
+			std::cout << "Error: PlusOp type mismatch! ltype or rtype is double, while the other is string!" << std::endl;
+			return nullptr;
+		}
+		return make_shared <MyDB_StringAttType>();
+	}
 
 	~PlusOp () {}
 };
@@ -172,6 +264,23 @@ public:
 		return "* (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+
+		if (ltype->promotableToInt() && rtype->promotableToInt()) {
+			return ltype;
+		}
+		if (ltype->promotableToDouble() && rtype->promotableToDouble()) {
+			return make_shared <MyDB_DoubleAttType>();
+		}
+		std::cout << "Error: TimesOp type mismatch!" << std::endl;
+		return nullptr;
+	}
+
 	~TimesOp () {}
 };
 
@@ -192,6 +301,22 @@ public:
 	string toString () {
 		return "/ (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
+
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+		if (ltype->promotableToInt() && rtype->promotableToInt()) {
+			return ltype;
+		}
+		if (ltype->promotableToDouble() && rtype->promotableToDouble()) {
+			return make_shared <MyDB_DoubleAttType>();
+		}
+		std::cout << "Error: DivideOP type mismatch!" << std::endl;
+		return nullptr;
+	}
 
 	~DivideOp () {}
 };
@@ -214,6 +339,26 @@ public:
 		return "> (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+		if (ltype->isBool() || rtype->isBool()) {
+			std::cout << "Error: GtOp is comparing boolean value(s)!" << std::endl;
+			return nullptr;
+		}
+		if (ltype->promotableToDouble() && rtype->promotableToDouble()) {
+			return make_shared <MyDB_BoolAttType>();
+		}
+		if (ltype->promotableToDouble() || rtype->promotableToDouble()) {
+			std::cout << "Error: GtOp is comparing numeric value and string!" << std::endl;
+			return nullptr;
+		}
+		return make_shared <MyDB_BoolAttType>();
+	}
+
 	~GtOp () {}
 };
 
@@ -235,6 +380,26 @@ public:
 		return "< (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+		if (ltype->isBool() || rtype->isBool()) {
+			std::cout << "Error: LtOp is comparing boolean value(s)!" << std::endl;
+			return nullptr;
+		}
+		if (ltype->promotableToDouble() && rtype->promotableToDouble()) {
+			return make_shared <MyDB_BoolAttType>();
+		}
+		if (ltype->promotableToDouble() || rtype->promotableToDouble()) {
+			std::cout << "Error: LtOp is comparing numeric value and string!" << std::endl;
+			return nullptr;
+		}
+		return make_shared <MyDB_BoolAttType>();
+	}
+
 	~LtOp () {}
 };
 
@@ -254,7 +419,27 @@ public:
 
 	string toString () {
 		return "!= (" + lhs->toString () + ", " + rhs->toString () + ")";
-	}	
+	}
+
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+		if (ltype->isBool() || rtype->isBool()) {
+			std::cout << "Error: NeqOp is comparing boolean value(s)!" << std::endl;
+			return nullptr;
+		}
+		if (ltype->promotableToDouble() && rtype->promotableToDouble()) {
+			return make_shared <MyDB_BoolAttType>();
+		}
+		if (ltype->promotableToDouble() || rtype->promotableToDouble()) {
+			std::cout << "Error: NeqOp is comparing numeric value and string!" << std::endl;
+			return nullptr;
+		}
+		return make_shared <MyDB_BoolAttType>();
+	}
 
 	~NeqOp () {}
 };
@@ -275,6 +460,19 @@ public:
 
 	string toString () {
 		return "|| (" + lhs->toString () + ", " + rhs->toString () + ")";
+	}	
+
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+		if (ltype->isBool() && rtype->isBool()) {
+			return ltype;
+		}
+		std::cout << "Error: OrOp type mismatch! " << std::endl;
+		return nullptr;
 	}	
 
 	~OrOp () {}
@@ -298,6 +496,26 @@ public:
 		return "== (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ltype = lhs->getType(catalog, tableNameGetter);
+		auto rtype = rhs->getType(catalog, tableNameGetter);
+		if ((!ltype) || (!rtype)) {
+			return nullptr;
+		}
+		if (ltype->isBool() || rtype->isBool()) {
+			std::cout << "Error: NeqOp is comparing boolean value(s)!" << std::endl;
+			return nullptr;
+		}
+		if (ltype->promotableToDouble() && rtype->promotableToDouble()) {
+			return make_shared <MyDB_BoolAttType>();
+		}
+		if (ltype->promotableToDouble() || rtype->promotableToDouble()) {
+			std::cout << "Error: NeqOp is comparing numeric value and string!" << std::endl;
+			return nullptr;
+		}
+		return make_shared <MyDB_BoolAttType>();
+	}	
+
 	~EqOp () {}
 };
 
@@ -315,6 +533,18 @@ public:
 
 	string toString () {
 		return "!(" + child->toString () + ")";
+	}	
+
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ctype = child->getType(catalog, tableNameGetter);
+		if (!ctype) {
+			return nullptr;
+		}
+		if (ctype->isBool()) {
+			return ctype;
+		}
+		std::cout << "Error: NotOp type mismatch!" << std::endl;
+		return nullptr;
 	}	
 
 	~NotOp () {}
@@ -335,6 +565,18 @@ public:
 	string toString () {
 		return "sum(" + child->toString () + ")";
 	}	
+	
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ctype = child->getType(catalog, tableNameGetter);
+		if (!ctype) {
+			return nullptr;
+		}
+		if (ctype->promotableToDouble()) {
+			return ctype;
+		}
+		std::cout << "Error: SumOp type mismatch!" << std::endl;
+		return nullptr;
+	}	
 
 	~SumOp () {}
 };
@@ -354,6 +596,18 @@ public:
 	string toString () {
 		return "avg(" + child->toString () + ")";
 	}	
+
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+		auto ctype = child->getType(catalog, tableNameGetter);
+		if (!ctype) {
+			return nullptr;
+		}
+		if (ctype->promotableToDouble()) {
+			return ctype;
+		}
+		std::cout << "Error: AvgOp type mismatch!" << std::endl;
+		return nullptr;
+	}
 
 	~AvgOp () {}
 };
