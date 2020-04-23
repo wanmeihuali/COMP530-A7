@@ -31,6 +31,8 @@ void RegularSelection :: run () {
 
 		myIter->getCurrent (inputRec);
 
+		std::cout << *inputRec << "\n";
+
 		// see if it is accepted by the predicate
 		if (!pred()->toBool ()) {
 			continue;

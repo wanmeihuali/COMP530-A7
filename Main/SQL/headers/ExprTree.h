@@ -22,7 +22,7 @@ class ExprTree {
 public:
 	virtual string toString () = 0;
 	virtual ~ExprTree () {}
-	virtual MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) = 0;
+	virtual MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) = 0;
 };
 
 class BoolLiteral : public ExprTree {
@@ -44,7 +44,7 @@ public:
 	}
 
 	// return a ptr point to boolAttType
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		return make_shared <MyDB_BoolAttType>();
 	}
 
@@ -66,7 +66,7 @@ public:
 	}	
 	
 	// return a ptr point to doubleAttType
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		return make_shared <MyDB_DoubleAttType>();
 	}
 
@@ -89,7 +89,7 @@ public:
 	}
 	
 	// return a ptr point to IntAttType
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		return make_shared <MyDB_IntAttType> ();
 	}
 
@@ -112,7 +112,7 @@ public:
 	}
 
 	// return a ptr point to StringAttType
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		return make_shared <MyDB_StringAttType> ();
 	}
 
@@ -136,14 +136,22 @@ public:
 		return "[" + tableName + "_" + attName + "]";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		/*
 			inputs: catalog and a function that can get the full tableName;
 			outputs: type of the current indentifier
 		*/
+
+		string tableFullName = "";
+		for (auto& namePair: tableNameGetter) {
+			if (namePair.second == tableName) {
+				tableFullName = namePair.first;
+			}
+		}
+
 		MyDB_Table table;
 		// tableName is abbreviation, use tableNameGetter to get the full-name
-		if (!table.fromCatalog(tableNameGetter(tableName), catalog)) {
+		if (!table.fromCatalog(tableFullName, catalog)) {
 			std::cout << "Error: referring to table that does not exist!" << std::endl;
 			return nullptr;
 		}
@@ -175,7 +183,7 @@ public:
 		return "- (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -213,7 +221,7 @@ public:
 		return "+ (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -264,7 +272,7 @@ public:
 		return "* (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -302,7 +310,7 @@ public:
 		return "/ (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -339,7 +347,7 @@ public:
 		return "> (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -380,7 +388,7 @@ public:
 		return "< (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -421,7 +429,7 @@ public:
 		return "!= (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -462,7 +470,7 @@ public:
 		return "|| (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -496,7 +504,7 @@ public:
 		return "== (" + lhs->toString () + ", " + rhs->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ltype = lhs->getType(catalog, tableNameGetter);
 		auto rtype = rhs->getType(catalog, tableNameGetter);
 		if ((!ltype) || (!rtype)) {
@@ -535,7 +543,7 @@ public:
 		return "!(" + child->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ctype = child->getType(catalog, tableNameGetter);
 		if (!ctype) {
 			return nullptr;
@@ -566,7 +574,7 @@ public:
 		return "sum(" + child->toString () + ")";
 	}	
 	
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ctype = child->getType(catalog, tableNameGetter);
 		if (!ctype) {
 			return nullptr;
@@ -597,7 +605,7 @@ public:
 		return "avg(" + child->toString () + ")";
 	}	
 
-	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, std::function<string(string)> tableNameGetter) override {
+	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		auto ctype = child->getType(catalog, tableNameGetter);
 		if (!ctype) {
 			return nullptr;

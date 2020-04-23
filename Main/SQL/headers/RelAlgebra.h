@@ -6,7 +6,7 @@
 
 enum RelAlgebraType {
     UNKNOWN,
-    TABLE,
+    TABLETYPE,
     SELECTIONPROJECTION,
     JOIN,
     AGGREGATE
@@ -35,8 +35,8 @@ class SelectionProjectionOp: public RelAlgebra {
         this->type = SELECTIONPROJECTION;
     }
 
-    MyDB_TableReaderWriterPtr execute() {
-
+    MyDB_TableReaderWriterPtr execute() override {
+        return nullptr;
     }
 };
 

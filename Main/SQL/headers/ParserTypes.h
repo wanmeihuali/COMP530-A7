@@ -13,6 +13,7 @@
 #include "RelAlgebra.h"
 #include <memory>
 #include "MyDB_TableReaderWriter.h"
+#include "MyDB_BPlusTreeReaderWriter.h"
 #include "RegularSelection.h"
 
 using namespace std;
@@ -80,7 +81,7 @@ public:
         ~ValueList () {}
 
         ValueList (struct Value *useMe) {
-              	valuesToCompute.push_back (useMe->myVal); 
+              	valuesToCompute.push_back (useMe->myVal);
         }
 
         ValueList () {}
@@ -259,7 +260,6 @@ public:
 		}
 	}
 
-	#include "FriendDecls.h"
 
 	/*
 	select 
@@ -310,17 +310,17 @@ public:
 			return this->getTableName(shortName);
 		};
 		for (auto& expr: valuesToSelect) {
-			if (expr->getType(catalog, tableNameGetter) == nullptr) {
+			if (expr->getType(catalog, this->tablesToProcess) == nullptr) {
 				return false;
 			}
 		}
 		for (auto& expr: allDisjunctions) {
-			if (expr->getType(catalog, tableNameGetter) == nullptr) {
+			if (expr->getType(catalog, this->tablesToProcess) == nullptr) {
 				return false;
 			}
 		}
 		for (auto& expr: groupingClauses) {
-			if (expr->getType(catalog, tableNameGetter) == nullptr) {
+			if (expr->getType(catalog, this->tablesToProcess) == nullptr) {
 				return false;
 			}
 		}
@@ -343,60 +343,101 @@ public:
 		return true;
 	}
 
-	std::shared_ptr<RelAlgebra> toRelAgebra(MyDB_CatalogPtr catelog, MyDB_BufferManagerPtr bufferMgr) {
-    if (groupingClauses.size() == 0 && tablesToProcess.size() == 1) {
-		// SFWQuery trans to RelAlgebra, only one selection from a single table
-		auto all_tables = MyDB_Table :: getAllTables(catelog);
-		string table_name = tablesToProcess[0].first;
-		string table_alias = tablesToProcess[0].second;
-		auto ori_input_table = std::make_shared<MyDB_TableReaderWriter>(all_tables[table_name], bufferMgr);
-		auto input_table_copy = std::make_shared<MyDB_TableReaderWriter>(ori_input_table);
-		
-		// modify the attributes in the copied input table
-		input_table_copy->getTable()->getSchema()->addPrefix(table_alias);
+	std::shared_ptr<RelAlgebra> toRelAgebra(
+		MyDB_CatalogPtr catelog, 
+		MyDB_BufferManagerPtr bufferMgr, 
+		map <string, MyDB_TableReaderWriterPtr>& allTableReaderWriters,
+		map <string, MyDB_BPlusTreeReaderWriterPtr>& allBPlusReaderWriters) {
+		if (groupingClauses.size() == 0 && tablesToProcess.size() == 1) {
+			// SFWQuery trans to RelAlgebra, only one selection from a single table
+			string table_name = tablesToProcess[0].first;
+			string table_alias = tablesToProcess[0].second;
+			MyDB_TableReaderWriterPtr ori_input_table;
+			if (allTableReaderWriters.find(table_name) != allTableReaderWriters.end()) {
+				ori_input_table = allTableReaderWriters[table_name];
+			} else {
+				ori_input_table = allBPlusReaderWriters[table_name];
+			}
 
-		//Q: the result of selection might not have a name
-		//Q: att name of the output table
-		auto tableNameGetter = [this](string shortName){
-			return this->getTableName(shortName);
-		};
-		
-		// generate the projections and the schema for the output table
-		vector<string> projections;
-		MyDB_SchemaPtr output_schema = make_shared<MyDB_Schema>();
-		for (auto& value_to_select : valuesToSelect) {
-			projections.push_back(value_to_select->toString());
-			output_schema->appendAtt(make_pair(value_to_select->toString(), value_to_select->getType(catelog, tableNameGetter)));
+			{
+				MyDB_RecordPtr tempRec = ori_input_table->getEmptyRecord();
+				MyDB_RecordIteratorPtr myIter = ori_input_table->getIterator(tempRec);
+
+				while (myIter->hasNext()) {
+					myIter->getNext();
+					cout << tempRec << "\n";
+				}
+			}
+
+			auto input_table_copy = std::make_shared<MyDB_TableReaderWriter>(ori_input_table);
+			
+			{
+				MyDB_RecordPtr tempRec = input_table_copy->getEmptyRecord();
+				MyDB_RecordIteratorAltPtr myIter = input_table_copy->getIteratorAlt();
+
+				while (myIter->advance()) {
+					myIter->getCurrent(tempRec);
+					cout << tempRec << "\n";
+				}
+			}
+
+			// modify the attributes in the copied input table
+			input_table_copy->getTable()->getSchema()->addPrefix(table_alias);
+
+			std::cout << input_table_copy->getTable()->getSchema() << std::endl;
+
+			//Q: the result of selection might not have a name
+			//Q: att name of the output table
+			auto tableNameGetter = [this](string shortName)->string {
+				return this->getTableName(shortName);
+			};
+			
+			// generate the projections and the schema for the output table
+			vector<string> projections;
+			MyDB_SchemaPtr output_schema = make_shared<MyDB_Schema>();
+			for (auto& value_to_select : valuesToSelect) {
+				projections.push_back(value_to_select->toString());
+				output_schema->appendAtt(make_pair(value_to_select->toString(), value_to_select->getType(catelog, this->tablesToProcess)));
+			}
+
+			//generate the output table based on the output_schema
+			// generate a temp talbe with as our output table
+			auto output_tablePtr = std::make_shared<MyDB_TableReaderWriter>(std::make_shared<MyDB_Table>("temp", "temp", output_schema), bufferMgr);
+
+			// generate the selectionPredicate
+			string selectionPredicate;
+
+			if (allDisjunctions.empty()) {
+				selectionPredicate = "bool[true]";
+			} else {
+				selectionPredicate = allDisjunctions[0]->toString();
+				for (size_t idx = 1; idx < allDisjunctions.size(); ++idx) {
+					selectionPredicate = "&& (" + allDisjunctions[idx]->toString() + ", " + selectionPredicate + ")";
+				}
+			}
+
+
+			// use the selection in Assignment 6 (RegularSelection)
+			RegularSelection regularSelect(input_table_copy, output_tablePtr, selectionPredicate, projections);
+
+			regularSelect.run();
+
+			{
+				MyDB_RecordPtr tempRec = output_tablePtr->getEmptyRecord();
+				MyDB_RecordIteratorAltPtr myIter = output_tablePtr->getIteratorAlt();
+
+				while (myIter->advance()) {
+					myIter->getCurrent(tempRec);
+					cout << tempRec << "\n";
+				}
+			}
+
+			return nullptr;
 		}
-
-		//generate the output table based on the output_schema
-		// generate a temp talbe with as our output table
-		auto output_tablePtr = std::make_shared<MyDB_TableReaderWriter>(std::make_shared<MyDB_Table>("temp", "temp", output_schema), bufferMgr);
-
-		// generate the electionPredicate
-		string selectionPredicate = "";
-		for (auto& disjunction : allDisjunctions) {
-			selectionPredicate = "&& (" + disjunction->toString() + ", " + selectionPredicate + ")";
-		}
-
-		// use the selection in Assignment 6 (RegularSelection)
-		RegularSelection regularSelect(input_table_copy, output_tablePtr, selectionPredicate, projections);
-
-		regularSelect.run();
-
-
-		MyDB_RecordPtr tempRec = output_tablePtr->getEmptyRecord();
-		MyDB_RecordIteratorAltPtr myIter = output_tablePtr->getIteratorAlt();
-
-		while (myIter->advance()) {
-			myIter->getCurrent(tempRec);
-			cout << tempRec << "\n";
-		}
-
-		return nullptr;
-	}
 	
-}
+
+	}
+	#include "FriendDecls.h"
 };
 
 // structure that sores an entire SQL statement
@@ -445,8 +486,12 @@ public:
 		return myQuery.isValid(catalog);
 	}
 
-	void executeSFWQuery(MyDB_CatalogPtr catelog, MyDB_BufferManagerPtr bufferMgr) {
-		myQuery.toRelAgebra(catelog, bufferMgr);
+	void executeSFWQuery(
+		MyDB_CatalogPtr catelog, 
+		MyDB_BufferManagerPtr bufferMgr, 
+		map <string, MyDB_TableReaderWriterPtr>& allTableReaderWriters,
+		map <string, MyDB_BPlusTreeReaderWriterPtr>& allBPlusReaderWriters) {
+		myQuery.toRelAgebra(catelog, bufferMgr, allTableReaderWriters, allBPlusReaderWriters);
 	}
 
 	#include "FriendDecls.h"

@@ -162,11 +162,13 @@ int main (int numArgs, char **args) {
 
 					} else if (final->isSFWQuery ()) {
 
+
+
 						// print it out
 						if (final->isSFWValid(myCatalog)) {
 							// print it out
 							final->printSFWQuery ();
-							final->executeSFWQuery(myCatalog, myMgr);
+							final->executeSFWQuery(myCatalog, myMgr, allTableReaderWriters, allBPlusReaderWriters);							
 						}
 					}
 
