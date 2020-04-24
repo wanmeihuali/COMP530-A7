@@ -31,7 +31,7 @@ void RegularSelection :: run () {
 
 		myIter->getCurrent (inputRec);
 
-		std::cout << *inputRec << "\n";
+		//std::cout << *inputRec << "\n";
 
 		// see if it is accepted by the predicate
 		if (!pred()->toBool ()) {
@@ -43,6 +43,7 @@ void RegularSelection :: run () {
 		for (auto &f : finalComputations) {
 			outputRec->getAtt (i++)->set (f());
 		}
+
 
 		outputRec->recordContentHasChanged ();
 		output->append (outputRec);

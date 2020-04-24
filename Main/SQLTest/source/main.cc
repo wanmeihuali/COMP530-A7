@@ -103,6 +103,18 @@ int main (int numArgs, char **args) {
 						// load up the file
 						pair <vector <size_t>, size_t> res = allTableReaderWriters[tokens[1]]->loadFromTextFile (tokens[3]);
 
+						{
+							MyDB_RecordPtr tempRec = allTableReaderWriters[tokens[1]]->getEmptyRecord();
+							MyDB_RecordIteratorAltPtr myIter = allTableReaderWriters[tokens[1]]->getIteratorAlt();
+							int idx = 0;
+							while (myIter->advance() && idx < 10) {
+								myIter->getCurrent(tempRec);
+								cout << tempRec << "\n";
+								idx++;
+							}
+							cout << "FIRST 10 ITEMS\n" << endl;
+						}
+
 						// and record the tuple various counts
 						allTableReaderWriters[tokens[1]]->getTable ()->setDistinctValues (res.first);
 						allTableReaderWriters[tokens[1]]->getTable ()->setTupleCount (res.second);
