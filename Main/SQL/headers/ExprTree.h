@@ -708,7 +708,7 @@ public:
 			return nullptr;
 		}
 		if (ctype->promotableToDouble()) {
-			return ctype;
+			return std::make_shared<MyDB_DoubleAttType>();
 		}
 		std::cout << "Error: AvgOp type mismatch!" << std::endl;
 		return nullptr;

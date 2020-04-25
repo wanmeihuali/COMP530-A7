@@ -4,6 +4,11 @@
 #include "MyDB_TableReaderWriter.h"
 #include <memory>
 
+#include "ExprTree.h"
+#include "MyDB_BPlusTreeReaderWriter.h"
+#include "Aggregate.h"
+#include "RegularSelection.h"
+
 enum RelAlgebraType {
     UNKNOWN,
     TABLETYPE,
@@ -62,5 +67,14 @@ class TableOp: public RelAlgebra {
 };
 */
 
+void ExecuteSFWQuery(
+    	vector <ExprTreePtr>& valuesToSelect,
+        vector <pair <string, string>>& tablesToProcess,
+        vector <ExprTreePtr>& allDisjunctions,
+        vector <ExprTreePtr>& groupingClauses,
+		MyDB_CatalogPtr catelog, 
+		MyDB_BufferManagerPtr bufferMgr, 
+		map <string, MyDB_TableReaderWriterPtr>& allTableReaderWriters,
+		map <string, MyDB_BPlusTreeReaderWriterPtr>& allBPlusReaderWriters); 
 
 #endif
