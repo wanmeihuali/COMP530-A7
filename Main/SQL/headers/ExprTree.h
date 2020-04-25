@@ -23,6 +23,7 @@ public:
 	virtual string toString () = 0;
 	virtual ~ExprTree () {}
 	virtual MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) = 0;
+	virtual vector<string> getIdentifiers() = 0;
 };
 
 class BoolLiteral : public ExprTree {
@@ -48,6 +49,10 @@ public:
 		return make_shared <MyDB_BoolAttType>();
 	}
 
+	vector<string> getIdentifiers() override {
+		return vector<string>();
+	}
+
 	~BoolLiteral () {}
 };
 
@@ -68,6 +73,10 @@ public:
 	// return a ptr point to doubleAttType
 	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		return make_shared <MyDB_DoubleAttType>();
+	}
+
+	vector<string> getIdentifiers() override {
+		return vector<string>();
 	}
 
 	~DoubleLiteral () {}
@@ -93,6 +102,11 @@ public:
 		return make_shared <MyDB_IntAttType> ();
 	}
 
+	
+	vector<string> getIdentifiers() override {
+		return vector<string>();
+	}
+
 	~IntLiteral () {}
 };
 
@@ -114,6 +128,11 @@ public:
 	// return a ptr point to StringAttType
 	MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) override {
 		return make_shared <MyDB_StringAttType> ();
+	}
+
+	
+	vector<string> getIdentifiers() override {
+		return vector<string>();
 	}
 
 	~StringLiteral () {}
@@ -162,6 +181,13 @@ public:
 		return attType;
 	} 
 
+	
+	vector<string> getIdentifiers() override {
+		vector<string> ret;
+		ret.push_back(tableName + "_" + attName);
+		return ret;
+	}
+
 	~Identifier () {}
 };
 
@@ -198,6 +224,13 @@ public:
 		}
 		std::cout << "Error: MinusOp type mismatch!" << std::endl;
 		return nullptr;
+	}
+
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
 	}
 
 	~MinusOp () {}
@@ -251,6 +284,13 @@ public:
 		return make_shared <MyDB_StringAttType>();
 	}
 
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
+	}
+
 	~PlusOp () {}
 };
 
@@ -289,6 +329,13 @@ public:
 		return nullptr;
 	}
 
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
+	}
+
 	~TimesOp () {}
 };
 
@@ -324,6 +371,13 @@ public:
 		}
 		std::cout << "Error: DivideOP type mismatch!" << std::endl;
 		return nullptr;
+	}
+
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
 	}
 
 	~DivideOp () {}
@@ -367,6 +421,13 @@ public:
 		return make_shared <MyDB_BoolAttType>();
 	}
 
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
+	}
+
 	~GtOp () {}
 };
 
@@ -406,6 +467,13 @@ public:
 			return nullptr;
 		}
 		return make_shared <MyDB_BoolAttType>();
+	}
+
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
 	}
 
 	~LtOp () {}
@@ -449,6 +517,13 @@ public:
 		return make_shared <MyDB_BoolAttType>();
 	}
 
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
+	}
+
 	~NeqOp () {}
 };
 
@@ -481,6 +556,13 @@ public:
 		}
 		std::cout << "Error: OrOp type mismatch! " << std::endl;
 		return nullptr;
+	}
+
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
 	}	
 
 	~OrOp () {}
@@ -522,6 +604,13 @@ public:
 			return nullptr;
 		}
 		return make_shared <MyDB_BoolAttType>();
+	}
+
+	vector<string> getIdentifiers() override {
+		vector<string> ret = lhs->getIdentifiers();
+		auto r_identifiers = rhs->getIdentifiers();
+		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
+		return ret;
 	}	
 
 	~EqOp () {}
@@ -555,6 +644,10 @@ public:
 		return nullptr;
 	}	
 
+	vector<string> getIdentifiers() override {
+		return child->getIdentifiers();
+	}
+
 	~NotOp () {}
 };
 
@@ -586,6 +679,10 @@ public:
 		return nullptr;
 	}	
 
+	vector<string> getIdentifiers() override {
+		return child->getIdentifiers();
+	}
+
 	~SumOp () {}
 };
 
@@ -615,6 +712,10 @@ public:
 		}
 		std::cout << "Error: AvgOp type mismatch!" << std::endl;
 		return nullptr;
+	}
+
+	vector<string> getIdentifiers() override {
+		return child->getIdentifiers();
 	}
 
 	~AvgOp () {}

@@ -177,11 +177,11 @@ int main (int numArgs, char **args) {
 
 
 						// print it out
-						if (final->isSFWValid(myCatalog)) {
+						//if (final->isSFWValid(myCatalog)) {
 							// print it out
 							final->printSFWQuery ();
 							final->executeSFWQuery(myCatalog, myMgr, allTableReaderWriters, allBPlusReaderWriters);							
-						}
+						//}
 					}
 
 					// get outta here

@@ -16,6 +16,8 @@
 #include "MyDB_BPlusTreeReaderWriter.h"
 #include "RegularSelection.h"
 #include <string>
+#include <sstream>
+#include "cstdio"
 #include "Aggregate.h"
 
 using namespace std;
@@ -437,7 +439,13 @@ s_s_name
 			MyDB_SchemaPtr output_schema = make_shared<MyDB_Schema>();
 			MyDB_SchemaPtr inter_output_schema = make_shared<MyDB_Schema>();
 			for (auto& grouping_clause : groupingClauses) {
-				inter_output_schema->appendAtt(make_pair(grouping_clause->toString(), grouping_clause->getType(catelog, this->tablesToProcess)));
+				auto grouping_identifiers = grouping_clause->getIdentifiers();
+				if (grouping_identifiers.size() == 1) {
+					inter_output_schema->appendAtt(make_pair(grouping_clause->getIdentifiers()[0], grouping_clause->getType(catelog, this->tablesToProcess)));
+				} else {
+					inter_output_schema->appendAtt(make_pair(grouping_clause->toString(), grouping_clause->getType(catelog, this->tablesToProcess)));
+				}
+
 				groupings.push_back(grouping_clause->toString());
 			}
 
@@ -512,7 +520,7 @@ s_s_name
 						projections.push_back("[MyDB_AggAtt" + std::to_string(aggidx1) + "]");
 						aggidx1++;
 					} else {
-						projections.push_back("[" + value_str + "]");
+						projections.push_back(value_str);
 					}
 					
 				}
@@ -524,8 +532,20 @@ s_s_name
 				Aggregate agg(input_table_copy, inter_output_tablePtr, aggToCompute, groupings, selectionPredicate);
 				agg.run();
 
+				
+				{
+					stringstream ss;
+					ss << inter_output_schema << "\n";
 
+					printf("%s", ss.str().c_str());
+				}
 
+				{
+					stringstream ss;
+					ss << output_schema << "\n";
+
+					printf("%s", ss.str().c_str());
+				}
 
 
 				RegularSelection regularSelect(inter_output_tablePtr, output_tablePtr, "bool[true]", projections);
