@@ -9,6 +9,7 @@
 #include <vector>
 #include <functional>
 
+
 // create a smart pointer for database tables
 using namespace std;
 class ExprTree;
@@ -23,7 +24,7 @@ public:
 	virtual string toString () = 0;
 	virtual ~ExprTree () {}
 	virtual MyDB_AttTypePtr getType(MyDB_CatalogPtr catalog, vector <pair <string, string>>& tableNameGetter) = 0;
-	virtual vector<string> getIdentifiers() = 0;
+	virtual vector<std::pair<string, string>> getIdentifiers() = 0;
 };
 
 class BoolLiteral : public ExprTree {
@@ -49,8 +50,8 @@ public:
 		return make_shared <MyDB_BoolAttType>();
 	}
 
-	vector<string> getIdentifiers() override {
-		return vector<string>();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		return vector<std::pair<string, string>>();
 	}
 
 	~BoolLiteral () {}
@@ -75,8 +76,8 @@ public:
 		return make_shared <MyDB_DoubleAttType>();
 	}
 
-	vector<string> getIdentifiers() override {
-		return vector<string>();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		return vector<std::pair<string, string>>();
 	}
 
 	~DoubleLiteral () {}
@@ -103,8 +104,8 @@ public:
 	}
 
 	
-	vector<string> getIdentifiers() override {
-		return vector<string>();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		return vector<std::pair<string, string>>();
 	}
 
 	~IntLiteral () {}
@@ -131,8 +132,8 @@ public:
 	}
 
 	
-	vector<string> getIdentifiers() override {
-		return vector<string>();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		return vector<std::pair<string, string>>();
 	}
 
 	~StringLiteral () {}
@@ -182,9 +183,9 @@ public:
 	} 
 
 	
-	vector<string> getIdentifiers() override {
-		vector<string> ret;
-		ret.push_back(tableName + "_" + attName);
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret;
+		ret.push_back(std::make_pair(tableName, attName));
 		return ret;
 	}
 
@@ -226,8 +227,8 @@ public:
 		return nullptr;
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
@@ -284,8 +285,8 @@ public:
 		return make_shared <MyDB_StringAttType>();
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
@@ -329,8 +330,8 @@ public:
 		return nullptr;
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
@@ -373,8 +374,8 @@ public:
 		return nullptr;
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
@@ -421,8 +422,8 @@ public:
 		return make_shared <MyDB_BoolAttType>();
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
@@ -469,8 +470,8 @@ public:
 		return make_shared <MyDB_BoolAttType>();
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
@@ -517,8 +518,8 @@ public:
 		return make_shared <MyDB_BoolAttType>();
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
@@ -558,8 +559,8 @@ public:
 		return nullptr;
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
@@ -606,12 +607,16 @@ public:
 		return make_shared <MyDB_BoolAttType>();
 	}
 
-	vector<string> getIdentifiers() override {
-		vector<string> ret = lhs->getIdentifiers();
+	vector<std::pair<string, string>> getIdentifiers() override {
+		vector<std::pair<string, string>> ret = lhs->getIdentifiers();
 		auto r_identifiers = rhs->getIdentifiers();
 		ret.insert(ret.end(), r_identifiers.begin(), r_identifiers.end());
 		return ret;
 	}	
+
+	std::pair<ExprTreePtr, ExprTreePtr> getChildren() {
+		return std::make_pair(lhs, rhs);
+	}
 
 	~EqOp () {}
 };
@@ -644,7 +649,7 @@ public:
 		return nullptr;
 	}	
 
-	vector<string> getIdentifiers() override {
+	vector<std::pair<string, string>> getIdentifiers() override {
 		return child->getIdentifiers();
 	}
 
@@ -679,7 +684,7 @@ public:
 		return nullptr;
 	}	
 
-	vector<string> getIdentifiers() override {
+	vector<std::pair<string, string>> getIdentifiers() override {
 		return child->getIdentifiers();
 	}
 
@@ -714,7 +719,7 @@ public:
 		return nullptr;
 	}
 
-	vector<string> getIdentifiers() override {
+	vector<std::pair<string, string>> getIdentifiers() override {
 		return child->getIdentifiers();
 	}
 
