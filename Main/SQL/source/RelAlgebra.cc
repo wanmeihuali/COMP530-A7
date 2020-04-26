@@ -178,8 +178,8 @@ struct TableEdge {
     std::string ltable;
     std::string rtable;
     std::vector<std::pair<ExprTreePtr, ExprTreePtr>> equalityChecks;
-    std::vector<std::string> leftTables;    //< original tables which the left table contains
-    std::vector<std::string> rightTables;   //< original tables which the right table contains
+    std::set<std::string> leftTables;    //< original tables which the left table contains
+    std::set<std::string> rightTables;   //< original tables which the right table contains
 };  // a set of equalityChecks between two table
 
 
@@ -300,7 +300,7 @@ void ExecuteSFWQuery(
         }
 
         typedef std::set<std::string> DisjunctionPrerequests;  //< table to be include for the disjunction to be execute
-        std::vector<std::pair<ExprTreePtr, DisjunctionPrerequests>> nonEqualityCheckDisjunctions; //< all expression that are not for join equality check, example: || (> ([o_o_orderdate], String[1995-01-01]), (== ([o_o_orderdate], String[1995-01-01]))
+        std::list<std::pair<ExprTreePtr, DisjunctionPrerequests>> nonEqualityCheckDisjunctions; //< all expression that are not for join equality check, example: || (> ([o_o_orderdate], String[1995-01-01]), (== ([o_o_orderdate], String[1995-01-01]))
 
         
         std::list<TableEdge> tableEdgeList;   // graph representation of tables and their join connctions
@@ -350,10 +350,10 @@ void ExecuteSFWQuery(
                     if (!edgeFound) { // not in the current edges, add it to the vector
                         std::vector<std::pair<ExprTreePtr, ExprTreePtr>> equalityCheckVec;
                         equalityCheckVec.push_back(std::make_pair(lhs, rhs));
-                        std::vector<string> ltables;
-                        ltables.push_back(ltable);
-                        std::vector<string> rtables;
-                        rtables.push_back(rtable);
+                        std::set<string> ltables;
+                        ltables.insert(ltable);
+                        std::set<string> rtables;
+                        rtables.insert(rtable);
                         tableEdgeList.push_back({ltable, rtable, equalityCheckVec, ltables, rtables});
                     }
                 } 
@@ -410,11 +410,77 @@ void ExecuteSFWQuery(
                 string output_schema_string = ss.str();
                 printf("join outputschema is %s\n", output_schema_string.c_str());
             }
-
             
-            // TO DO: prepare leftSelectionPredicate, finalSelectionPredicate, rightSelectionPredicate
-            // TO DO: equalityChecks: exprtreeptr->string
+            // prepare leftSelectionPredicate
+            string leftSelectionPredicate = "bool[True]";
+            for (auto disjunction = nonEqualityCheckDisjunctions.begin(); disjunction != nonEqualityCheckDisjunctions.end(); ++disjunction) 
+            {
+                ExprTreePtr disjunctionExpr = disjunction->first;
+                DisjunctionPrerequests disjunctionPrerequests = disjunction->second;
+                bool allPrerequestFound = true;
+                for (auto& prerequest: disjunctionPrerequests) {
+                    if (bestEdge->leftTables.find(prerequest) == bestEdge->leftTables.end()) {
+                        allPrerequestFound = false;
+                        break;
+                    }
+                }
+                if (allPrerequestFound) {
+                    leftSelectionPredicate = "&& (" + disjunctionExpr->toString() + ", " + leftSelectionPredicate + ")";
+                    nonEqualityCheckDisjunctions.erase(disjunction++);
+                }
+            }
+
+            // prepare rightSelectionPredicate
+            string rightSelectionPredicate = "bool[True]";
+            for (auto disjunction = nonEqualityCheckDisjunctions.begin(); disjunction != nonEqualityCheckDisjunctions.end(); ++disjunction) 
+            {
+                ExprTreePtr disjunctionExpr = disjunction->first;
+                DisjunctionPrerequests disjunctionPrerequests = disjunction->second;
+                bool allPrerequestFound = true;
+                for (auto& prerequest: disjunctionPrerequests) {
+                    if (bestEdge->rightTables.find(prerequest) == bestEdge->rightTables.end()) {
+                        allPrerequestFound = false;
+                        break;
+                    }
+                }
+                if (allPrerequestFound) {
+                    rightSelectionPredicate = "&& (" + disjunctionExpr->toString() + ", " + rightSelectionPredicate + ")";
+                    nonEqualityCheckDisjunctions.erase(disjunction++);
+                }
+            }
+
+            // prepare  finalSelectionPredicate, rightSelectionPredicate
+            string finalSelectionPredicate = "bool[True]";
+            for (auto disjunction = nonEqualityCheckDisjunctions.begin(); disjunction != nonEqualityCheckDisjunctions.end(); ++disjunction) 
+            {
+                ExprTreePtr disjunctionExpr = disjunction->first;
+                DisjunctionPrerequests disjunctionPrerequests = disjunction->second;
+                bool allPrerequestFound = true;
+                for (auto& prerequest: disjunctionPrerequests) {
+                    if (
+                        bestEdge->rightTables.find(prerequest) == bestEdge->rightTables.end() ||
+                        bestEdge->leftTables.find(prerequest) == bestEdge->leftTables.end()
+                    ) {
+                        allPrerequestFound = false;
+                        break;
+                    }
+                }
+                if (allPrerequestFound) {
+                    finalSelectionPredicate = "&& (" + disjunctionExpr->toString() + ", " + finalSelectionPredicate + ")";
+                    nonEqualityCheckDisjunctions.erase(disjunction++);
+                }
+            }
+
+            // TO DO: equalityChecks: exprtreeptr->string()
+            vector <pair <string, string>> equalityChecksForJoin;
+            for (TableEdge& edge : tableEdgeList) {
+                for(auto eqCheck : edge.equalityChecks){
+                    equalityChecksForJoin.push_back(std::make_pair(eqCheck.first->toString(), eqCheck.second->toString()));
+                }
+            }
+            
             // TO DO: run join
+            //ScanJoin scanJoin();
             // TO DO: remove selected edge, iterate through edgelist, update all edges containing node in selected edge
             // TO DO: update tableProjectionRequirement for new table
             // TO DO: add new table to tableReaderWriterWithPrefixLookUpMap
