@@ -5,6 +5,7 @@
 #include <set>
 #include <list>
 #include <queue>
+#include <limits>
 #include "ScanJoin.h"
 
 void ExecuteSingleTableQuery(
@@ -116,7 +117,7 @@ void ExecuteSingleTableQuery(
         Aggregate agg(input_table_copy, inter_output_tablePtr, aggToCompute, groupings, selectionPredicate);
         agg.run();
 
-        
+ /*       
         {
             stringstream ss;
             ss << inter_output_schema << "\n";
@@ -130,7 +131,7 @@ void ExecuteSingleTableQuery(
 
             printf("%s", ss.str().c_str());
         }
-
+*/
 
         RegularSelection regularSelect(inter_output_tablePtr, output_tablePtr, "bool[true]", projections);
         regularSelect.run();
@@ -151,10 +152,18 @@ void ExecuteSingleTableQuery(
         MyDB_RecordPtr tempRec = output_tablePtr->getEmptyRecord();
         MyDB_RecordIteratorAltPtr myIter = output_tablePtr->getIteratorAlt();
 
+        int outputCounter = 0;
         while (myIter->advance()) {
             myIter->getCurrent(tempRec);
-            cout << tempRec << "\n";
+            
+            outputCounter++;
+            if (outputCounter <= 30) {
+                cout << tempRec << "\n";
+            } else if (outputCounter == 31) {
+                cout << "...\n";
+            }
         }
+        cout << "There are " << outputCounter << " records in the output" << std::endl;
     }
 }
 
@@ -212,6 +221,9 @@ size_t estimateJoinOutputSize(
     */
    size_t table0PageNum = table0->getNumPages();
    size_t table1PageNum = table1->getNumPages();
+   if (edge.equalityChecks.size() == 0) {
+       return (std::numeric_limits<size_t>::max)();
+   }
    return table0PageNum * table1PageNum;
 }
 
@@ -353,7 +365,8 @@ void ExecuteSFWQuery(
                     }
                 } 
             } 
-            if (!isJoinequalityCheck) { // the current disjunction is not an equality check for join
+            // if (!isJoinequalityCheck) 
+            { // the current disjunction is not an equality check for join
                 auto disjunctionAtts = disjunction->getIdentifiers();
                 DisjunctionPrerequests prerequests;
                 for (auto& disjunctionAtt: disjunctionAtts) {
@@ -445,15 +458,17 @@ void ExecuteSFWQuery(
                 projections.push_back("[" + attName + "]");
                 outputProjectionRequirement.insert(attName);
             }
+            /*
             {
                 std::stringstream ss;
                 ss << join_output_schema << std::endl;
                 string output_schema_string = ss.str();
                 printf("join outputschema is %s\n", output_schema_string.c_str());
             }
+            */
             
             // prepare leftSelectionPredicate
-            string leftSelectionPredicate = "bool[True]";
+            string leftSelectionPredicate = "bool[true]";
             for (auto disjunction = nonEqualityCheckDisjunctions.begin(); disjunction != nonEqualityCheckDisjunctions.end(); ++disjunction) 
             {
                 ExprTreePtr disjunctionExpr = disjunction->first;
@@ -473,7 +488,7 @@ void ExecuteSFWQuery(
             }
 
             // prepare rightSelectionPredicate
-            string rightSelectionPredicate = "bool[True]";
+            string rightSelectionPredicate = "bool[true]";
             for (auto disjunction = nonEqualityCheckDisjunctions.begin(); disjunction != nonEqualityCheckDisjunctions.end(); ++disjunction) 
             {
                 ExprTreePtr disjunctionExpr = disjunction->first;
@@ -493,7 +508,7 @@ void ExecuteSFWQuery(
             }
 
             // prepare finalSelectionPredicate
-            string finalSelectionPredicate = "bool[True]";
+            string finalSelectionPredicate = "bool[true]";
             for (auto disjunction = nonEqualityCheckDisjunctions.begin(); disjunction != nonEqualityCheckDisjunctions.end(); ++disjunction) 
             {
                 ExprTreePtr disjunctionExpr = disjunction->first;
@@ -542,18 +557,22 @@ void ExecuteSFWQuery(
                 rightSelectionPredicate
             );
             scanJoin.run();
-
+/*
             {
                 cout << joinOutputTableAlias << std::endl;
                 MyDB_RecordPtr tempRec = joinOutputTable->getEmptyRecord();
                 MyDB_RecordIteratorAltPtr myIter = joinOutputTable->getIteratorAlt();
-
+                int iterIdx = 0;
                 while (myIter->advance()) {
                     myIter->getCurrent(tempRec);
-                    cout << tempRec << "\n";
+                    iterIdx++;
+                    if (iterIdx < 10) {
+                        cout << tempRec << "\n";
+                    }  
                 }
+                cout << "There are " << iterIdx << " records in the table\n";
             }
-            
+*/            
             // update tableProjectionRequirement for new table
             tableProjectionRequirement[joinOutputTableAlias] = outputProjectionRequirement;
 
@@ -621,6 +640,19 @@ void ExecuteSFWQuery(
         // TO DO: do selection
         string lastJoinOutputTableAlias = "TempJoinOutput" + to_string(joinTableIdx);
         auto lastJoinOutput = tableReaderWriterWithPrefixLookUpMap[lastJoinOutputTableAlias];
+
+
+
+        ExecuteSingleTableQuery(
+            lastJoinOutput,
+            valuesToSelect,
+            tablesToProcess,
+            allDisjunctions,
+            groupingClauses,
+            catelog,
+            bufferMgr
+        );
+        /*
         {
             MyDB_RecordPtr tempRec = lastJoinOutput->getEmptyRecord();
             MyDB_RecordIteratorAltPtr myIter = lastJoinOutput->getIteratorAlt();
@@ -630,5 +662,7 @@ void ExecuteSFWQuery(
                 cout << tempRec << "\n";
             }
         }
+        */
+
     }    
 }

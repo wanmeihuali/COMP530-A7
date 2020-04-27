@@ -10,6 +10,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iterator>
+#include <chrono>
 
 using namespace std;
 string toLower (string data) {
@@ -65,6 +66,8 @@ int main (int numArgs, char **args) {
 
 		// get a line
 		for (string line; getline (cin, line);) {
+
+			std::cout << line << std::endl;	// to generate output file with query
 			
 			// see if it has a ";" at the end
 			size_t pos = line.find (';');
@@ -102,7 +105,7 @@ int main (int numArgs, char **args) {
 
 						// load up the file
 						pair <vector <size_t>, size_t> res = allTableReaderWriters[tokens[1]]->loadFromTextFile (tokens[3]);
-
+/*
 						{
 							MyDB_RecordPtr tempRec = allTableReaderWriters[tokens[1]]->getEmptyRecord();
 							MyDB_RecordIteratorAltPtr myIter = allTableReaderWriters[tokens[1]]->getIteratorAlt();
@@ -114,6 +117,7 @@ int main (int numArgs, char **args) {
 							}
 							cout << "FIRST 10 ITEMS\n" << endl;
 						}
+*/
 
 						// and record the tuple various counts
 						allTableReaderWriters[tokens[1]]->getTable ()->setDistinctValues (res.first);
@@ -179,8 +183,14 @@ int main (int numArgs, char **args) {
 						// print it out
 						//if (final->isSFWValid(myCatalog)) {
 							// print it out
-							final->printSFWQuery ();
-							final->executeSFWQuery(myCatalog, myMgr, allTableReaderWriters, allBPlusReaderWriters);							
+							//final->printSFWQuery ();
+							auto start_time = std::chrono::system_clock::now();
+							final->executeSFWQuery(myCatalog, myMgr, allTableReaderWriters, allBPlusReaderWriters);			
+							auto end_time = std::chrono::system_clock::now();
+							auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+							cout << "The query takes "
+								 << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den
+								 << " seconds" << std::endl;				
 						//}
 					}
 
