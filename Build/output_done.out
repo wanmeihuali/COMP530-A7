@@ -1,0 +1,475 @@
+
+          Welcome to MyDB v0.1
+
+"Not the worst database in the world" (tm) 
+
+MyDB> CREATE TABLE part (
+    > 
+    > 	p_partkey		INT,
+    > 	p_name		 	STRING,	
+    > 	p_mfgr			STRING,
+    > 	p_brand			STRING,
+    > 	p_type			STRING,
+    > 	p_size			INT,
+    > 	p_container		STRING,
+    > 	p_retailprice		DOUBLE,	
+    > 	p_comment		STRING
+    > );
+Added table part
+MyDB> 
+    > CREATE TABLE supplier (
+    > 	s_suppkey		INT,
+    > 	s_name			STRING,
+    > 	s_address		STRING,
+    > 	s_nationkey		INT,
+    > 	s_phone			STRING,
+    > 	s_acctbal		DOUBLE,
+    > 	s_comment		STRING
+    > );
+Added table supplier
+MyDB> 
+    > CREATE TABLE partsupp (
+    > 	ps_partkey	INT,	
+    > 	ps_suppkey	INT,	
+    > 	ps_availqty	INT,
+    > 	ps_supplycost	DOUBLE,
+    > 	ps_comment	STRING
+    > );
+Added table partsupp
+MyDB> 
+    > CREATE TABLE customer (
+    > 	c_custkey	INT,
+    > 	c_name		STRING,
+    > 	c_address	STRING,
+    > 	c_nationkey	INT,
+    > 	c_phone		STRING,
+    > 	c_acctbal	DOUBLE,
+    > 	c_mktsegment	STRING,
+    > 	c_comment	STRING
+    > );
+Added table customer
+MyDB> 
+    > CREATE TABLE orders (
+    > 	o_orderkey	INT,
+    > 	o_custkey	INT,	
+    > 	o_orderstatus	STRING,
+    > 	o_totalprice	DOUBLE,
+    > 	o_orderdate	STRING,
+    > 	o_orderpriority	STRING,
+    > 	o_clerk		STRING,
+    > 	o_shippriority	INT,
+    > 	o_comment	STRING
+    > );
+Added table orders
+MyDB> 
+    > CREATE TABLE lineitem (
+    > 	l_orderkey	INT,
+    > 	l_partkey	INT,
+    > 	l_suppkey	INT,
+    > 	l_linenumber	INT,
+    > 	l_quantity	INT,
+    > 	l_extendedprice	DOUBLE,
+    > 	l_discount	DOUBLE,
+    > 	l_tax		DOUBLE,
+    > 	l_returnflag	STRING,
+    > 	l_linestatus	STRING,
+    > 	l_shipdate	STRING,
+    > 	l_commitdate	STRING,
+    > 	l_receiptdate	STRING,
+    > 	l_shipinstruct	STRING,
+    > 	l_shipmode	STRING,
+    > 	l_comment	STRING
+    > );
+Added table lineitem
+MyDB> 
+    > CREATE TABLE nation (
+    > 	n_nationkey		INT,
+    > 	n_name			STRING,
+    > 	n_regionkey		INT,	
+    > 	n_comment		STRING
+    > );
+Added table nation
+MyDB> 
+    > CREATE TABLE region (
+    > 	r_regionkey	INT,
+    > 	r_name		STRING,
+    > 	r_comment	STRING
+    > );
+Added table region
+MyDB> 
+    > load part from part.tbl;
+OK, loading part from text file.
+Loaded 200000 records.
+MyDB> load supplier from supplier.tbl;
+OK, loading supplier from text file.
+Loaded 10000 records.
+MyDB> load partsupp from partsupp.tbl;
+OK, loading partsupp from text file.
+Loaded 800000 records.
+MyDB> load customer from customer.tbl;
+OK, loading customer from text file.
+Loaded 150000 records.
+MyDB> load region from region.tbl;
+OK, loading region from text file.
+Loaded 5 records.
+MyDB> load nation from nation.tbl;
+OK, loading nation from text file.
+Loaded 25 records.
+MyDB> load lineitem from lineitem.tbl;
+OK, loading lineitem from text file.
+Loaded 6001215 records.
+MyDB> load orders from orders.tbl;
+OK, loading orders from text file.
+Loaded 1500000 records.
+MyDB> 
+    > select 
+    > 	l.l_comment
+    > from 
+    > 	lineitem as l
+    > where
+    > 	(l.l_shipdate = "1994-05-12") and
+    > 	(l.l_commitdate = "1994-05-22") and
+    > 	(l.l_receiptdate = "1994-06-10");
+furiously ir|
+There are 1 records in the output
+The query takes15.9224 seconds
+MyDB> 
+    > 
+    > 
+    > select 
+    > 	l.l_orderkey
+    > from
+    > 	lineitem as l
+    > where
+    > 	(l.l_shipinstruct = "TAKE BACK RETURN") and
+    > 	(l.l_extendedprice / l.l_quantity > 1759.6) and
+    > 	(l.l_extendedprice / l.l_quantity < 1759.8);
+420|
+547|
+5895|
+10917|
+17701|
+22182|
+43045|
+44741|
+56866|
+58052|
+84003|
+89059|
+90912|
+92198|
+94439|
+95075|
+95845|
+99392|
+100481|
+110279|
+110530|
+111425|
+124290|
+128865|
+131525|
+132993|
+140418|
+141381|
+143524|
+147301|
+...
+There are 1057 records in the output
+The query takes16.6147 seconds
+MyDB> 
+    > 
+    > select 
+    > 	sum (1), 
+    > 	avg ((o.o_totalprice - 32592.14) / 32592.14)
+    > from
+    > 	orders as o
+    > where
+    > 	(o.o_orderstatus = "F") and 
+    > 	(o.o_orderpriority < "2-HIGH" or o.o_orderpriority = "2-HIGH");
+292098|3.620425|
+There are 1 records in the output
+The query takes4.1857 seconds
+MyDB> 
+    > 
+    > select 
+    > 	avg (o.o_totalprice),
+    > 	"order priority was " + o.o_orderpriority
+    > from
+    > 	orders as o
+    > where
+    > 	(o.o_orderstatus = "F")
+    > group by
+    > 	o.o_orderpriority;
+150611.604523|order priority was 5-LOW|
+150129.831018|order priority was 4-NOT SPECIFIED|
+150068.606146|order priority was 3-MEDIUM|
+150724.811169|order priority was 2-HIGH|
+150454.466436|order priority was 1-URGENT|
+There are 5 records in the output
+The query takes3.07984 seconds
+MyDB> 
+    > select
+    > 	"return flag was " + l.l_returnflag,
+    > 	sum (l.l_quantity),
+    > 	sum (l.l_extendedprice),
+    > 	sum (l.l_extendedprice*(1-l.l_discount)),
+    > 	sum (l.l_extendedprice*(1-l.l_discount)*(1+l.l_tax)),
+    > 	avg (l.l_quantity),
+    > 	avg (l.l_extendedprice),
+    > 	avg (l.l_discount),
+    > 	sum (1)
+    > from
+    > 	lineitem as l
+    > where
+    > 	(l.l_shipdate < "1998-12-01") and
+    >         (l.l_shipdate > "1998-06-01")
+    > group by
+    > 	l.l_returnflag;
+return flag was N|7826475|11731187444.120041|11144649274.750301|11590849811.731108|25.487758|38203.874855|0.049994|307068|
+There are 1 records in the output
+The query takes16.127 seconds
+MyDB> 
+    > select
+    > 	l.l_shipmode,
+    > 	sum (1)
+    > from
+    > 	orders as o,
+    > 	lineitem as l
+    > where
+    > 	(o.o_orderkey = l.l_orderkey)
+    > 	and (o.o_orderstatus = "F")
+    > 	and (l.l_shipmode = "truck" or l.l_shipmode = "rail")
+    > 	and (l.l_commitdate < l.l_receiptdate)
+    > 	and (l.l_shipdate < l.l_commitdate)
+    > 	and (l.l_receiptdate > "1996-06-20" or l.l_receiptdate = "1996-06-20")
+    > 	and (l.l_receiptdate < "1997-06-20" or l.l_receiptdate = "1997-06-20")
+    > group by
+    > 	l.l_shipmode;
+There are 0 records in the output
+The query takes18.6158 seconds
+MyDB> 
+    > select
+    > 	ps.ps_partkey, 
+    > 	avg (ps.ps_supplycost)
+    > from
+    > 	part as p,
+    > 	partsupp as ps,
+    > 	supplier as s,
+    > 	nation as n,
+    > 	region as r
+    > where
+    > 	(p.p_partkey = ps.ps_partkey)
+    > 	and (s.s_suppkey = ps.ps_suppkey)
+    > 	and (s.s_nationkey = n.n_nationkey)
+    > 	and (n.n_regionkey = r.r_regionkey)
+    > 	and (r.r_name = "AMERICA")
+    > group by
+    > 	ps.ps_partkey;
+1|665.290000|
+2|646.880000|
+5|219.830000|
+7|763.980000|
+8|916.910000|
+9|188.020000|
+10|418.635000|
+12|498.395000|
+13|409.506667|
+14|891.445000|
+15|458.670000|
+18|367.633333|
+19|144.800000|
+20|675.540000|
+23|103.130000|
+25|694.350000|
+27|348.610000|
+28|204.860000|
+29|857.885000|
+33|929.050000|
+34|265.310000|
+35|540.180000|
+37|15.720000|
+43|493.190000|
+44|608.080000|
+45|919.630000|
+46|106.800000|
+48|611.160000|
+53|388.080000|
+54|686.510000|
+...
+There are 119448 records in the output
+The query takes3.44449 seconds
+MyDB> 
+    > select
+    > 	n.n_name,
+    > 	o.o_orderdate,
+    > 	l.l_extendedprice * (1 - l.l_discount) - ps.ps_supplycost * l.l_quantity 
+    > from
+    > 	part as p,
+    > 	supplier as s,
+    > 	lineitem as l,
+    > 	partsupp as ps,
+    > 	orders as o,
+    > 	nation as n
+    > where
+    > 	(s.s_suppkey = l.l_suppkey)
+    > 	and (ps.ps_suppkey = l.l_suppkey)
+    > 	and (ps.ps_partkey = l.l_partkey)
+    > 	and (p.p_partkey = l.l_partkey)
+    > 	and (o.o_orderkey = l.l_orderkey)
+    > 	and (s.s_nationkey = n.n_nationkey)
+    > 	and (p.p_type = "STANDARD POLISHED TIN" or
+    > 	     p.p_type = "ECONOMY BRUSHED TIN" or
+    > 	     p.p_type = "ECONOMY POLISHED NICKEL" or
+    > 	     p.p_type = "SMALL ANODIZED COPPER");
+SAUDI ARABIA|1996-01-02|18316.272000|
+ARGENTINA|1995-10-23|30559.662400|
+BRAZIL|1992-10-21|62029.220000|
+MOZAMBIQUE|1995-05-25|16423.440000|
+CANADA|1994-09-29|25808.715200|
+ETHIOPIA|1992-10-02|9102.854800|
+KENYA|1994-06-30|16469.250000|
+MOROCCO|1996-10-01|12667.087500|
+UNITED STATES|1993-05-08|16097.496800|
+KENYA|1992-10-08|64422.019200|
+IRAQ|1997-03-26|73932.740000|
+RUSSIA|1993-08-29|32767.364000|
+INDONESIA|1997-02-23|36191.040000|
+ARGENTINA|1993-01-27|29435.542500|
+GERMANY|1993-09-23|11956.376000|
+IRAQ|1998-05-23|35616.753900|
+JORDAN|1993-04-17|1054.100000|
+IRAQ|1995-03-18|19184.499600|
+EGYPT|1998-01-29|19752.800000|
+JORDAN|1993-03-09|7511.914000|
+PERU|1997-09-24|1373.122400|
+INDIA|1993-09-05|2605.320300|
+INDIA|1998-05-15|15207.480000|
+JAPAN|1995-03-04|54104.179200|
+RUSSIA|1998-07-30|40551.258000|
+JORDAN|1998-07-30|291.942900|
+GERMANY|1996-10-19|28146.728400|
+ETHIOPIA|1996-08-15|9496.427600|
+CANADA|1992-01-02|20866.500000|
+ARGENTINA|1993-01-11|3262.050000|
+...
+There are 160089 records in the output
+The query takes49.2342 seconds
+MyDB> 
+    > select
+    > 	"supplier name was " + s.s_name,
+    > 	sum (1) 
+    > from
+    > 	supplier as s,
+    > 	lineitem as l1,
+    > 	lineitem as l2,
+    > 	orders as o,
+    > 	nation as n
+    > where
+    > 	(s.s_suppkey = l1.l_suppkey)
+    > 	and (o.o_orderkey = l1.l_orderkey)
+    > 	and (o.o_orderstatus = "F")
+    > 	and (l1.l_receiptdate > l1.l_commitdate)
+    > 	and (l2.l_orderkey = l1.l_orderkey)
+    > 	and (not l2.l_suppkey = l1.l_suppkey)
+    > group by
+    > 	s.s_name;
+supplier name was Supplier#000003474|20000|
+supplier name was Supplier#000001798|20625|
+supplier name was Supplier#000003928|17850|
+supplier name was Supplier#000008571|20325|
+supplier name was Supplier#000005405|22725|
+supplier name was Supplier#000005133|18450|
+supplier name was Supplier#000003490|17450|
+supplier name was Supplier#000009201|19450|
+supplier name was Supplier#000007089|19375|
+supplier name was Supplier#000001006|21525|
+supplier name was Supplier#000007721|19425|
+supplier name was Supplier#000001195|18250|
+supplier name was Supplier#000000743|14950|
+supplier name was Supplier#000005391|18425|
+supplier name was Supplier#000000613|16650|
+supplier name was Supplier#000002073|17900|
+supplier name was Supplier#000005221|18350|
+supplier name was Supplier#000001989|17725|
+supplier name was Supplier#000007274|16825|
+supplier name was Supplier#000004707|16600|
+supplier name was Supplier#000007181|17175|
+supplier name was Supplier#000000217|18900|
+supplier name was Supplier#000000849|18425|
+supplier name was Supplier#000004572|19575|
+supplier name was Supplier#000003602|16175|
+supplier name was Supplier#000005368|23300|
+supplier name was Supplier#000004240|18975|
+supplier name was Supplier#000001861|19200|
+supplier name was Supplier#000004143|19300|
+supplier name was Supplier#000008817|20050|
+...
+There are 10000 records in the output
+The query takes1003.17 seconds
+MyDB> 
+    > select
+    > 	"date was " + o.o_orderdate,
+    > 	avg (l.l_extendedprice * (1-l.l_discount))
+    > from
+    > 	part as p,
+    > 	supplier as s,
+    > 	lineitem as l,
+    > 	orders as o,
+    > 	customer as c,
+    > 	nation as n1,
+    > 	nation as n2,
+    > 	region as r1,
+    > 	region as r2
+    > where
+    > 	(p.p_partkey = l.l_partkey)
+    > 	and (s.s_suppkey = l.l_suppkey)
+    > 	and (l.l_orderkey = o.o_orderkey)
+    > 	and (o.o_custkey = c.c_custkey)
+    > 	and (c.c_nationkey = n1.n_nationkey)
+    > 	and (n1.n_regionkey = r1.r_regionkey)
+    > 	and (r1.r_name = "AMERICA")
+    > 	and (n2.n_regionkey = r2.r_regionkey)
+    > 	and (r2.r_name = "MIDDLE EAST")
+    > 	and (s.s_nationkey = n2.n_nationkey)
+    > 	and (o.o_orderdate > "1995-01-01" or o.o_orderdate = "1995-01-01")
+    > 	and (o.o_orderdate < "1996-12-31" or o.o_orderdate = "1996-12-31")
+    > 	and (p.p_type = "ECONOMY ANODIZED STEEL")
+    > group by
+    > 	o.o_orderdate;
+date was 1996-01-23|43832.736400|
+date was 1995-05-10|20176.164000|
+date was 1996-11-21|11626.190400|
+date was 1996-03-30|33689.823600|
+date was 1995-11-09|27527.406000|
+date was 1996-11-25|48730.917200|
+date was 1996-09-21|16471.871900|
+date was 1995-10-22|40922.658833|
+date was 1996-05-14|34685.989200|
+date was 1995-09-26|6847.404000|
+date was 1995-08-03|17143.601400|
+date was 1996-01-21|32480.253000|
+date was 1996-03-19|17802.884367|
+date was 1995-12-08|22867.256250|
+date was 1996-01-16|4573.208533|
+date was 1996-08-20|40757.247225|
+date was 1996-01-27|30405.276000|
+date was 1996-04-12|28364.324000|
+date was 1995-07-15|2841.090000|
+date was 1996-08-21|46640.546400|
+date was 1996-10-10|30696.780450|
+date was 1996-06-20|40446.542750|
+date was 1996-07-19|45519.325800|
+date was 1995-06-12|51280.290000|
+date was 1995-05-02|10158.220800|
+date was 1995-03-01|37398.855600|
+date was 1996-05-08|33847.488000|
+date was 1995-11-27|51575.723800|
+date was 1995-03-20|27660.817300|
+date was 1995-12-24|32718.390300|
+...
+There are 376 records in the output
+The query takes25.5476 seconds
+MyDB> 
+    > exit;
+OK, goodbye.
