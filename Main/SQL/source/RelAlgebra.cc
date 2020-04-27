@@ -4,6 +4,8 @@
 #include <map>
 #include <set>
 #include <list>
+#include <queue>
+#include "ScanJoin.h"
 
 void ExecuteSingleTableQuery(
     MyDB_TableReaderWriterPtr input_table_copy,
@@ -175,11 +177,9 @@ MyDB_TableReaderWriterPtr findTableReaderWriter(
 
 
 struct TableEdge {
-    std::string ltable;
-    std::string rtable;
+    std::string lalias;
+    std::string ralias;
     std::vector<std::pair<ExprTreePtr, ExprTreePtr>> equalityChecks;
-    std::set<std::string> leftTables;    //< original tables which the left table contains
-    std::set<std::string> rightTables;   //< original tables which the right table contains
 };  // a set of equalityChecks between two table
 
 
@@ -188,8 +188,8 @@ size_t estimateJoinOutputSize(
     std::map<std::string, MyDB_TableReaderWriterPtr> tableReaderWriterLookUpMap,
     TableEdge& edge) 
 {
-    MyDB_TableReaderWriterPtr table0 = tableReaderWriterLookUpMap[edge.ltable];
-    MyDB_TableReaderWriterPtr table1 = tableReaderWriterLookUpMap[edge.rtable];
+    MyDB_TableReaderWriterPtr table0 = tableReaderWriterLookUpMap[edge.lalias];
+    MyDB_TableReaderWriterPtr table1 = tableReaderWriterLookUpMap[edge.ralias];
     /*
     size_t table0Size = table0->getTable()->getTupleCount();
     size_t table1Size = table1->getTable()->getTupleCount();
@@ -256,6 +256,7 @@ void ExecuteSFWQuery(
         */
         std::map<std::string, MyDB_TableReaderWriterPtr> tableReaderWriterLookUpMap;
         std::map<std::string, MyDB_TableReaderWriterPtr> tableReaderWriterWithPrefixLookUpMap;
+        std::map<std::string, std::set<std::string>> joinedTableOriginalAlias; // given an alias of a joined table get the original alias 
         std::map<std::string, std::string> tableNameToAlias;
         std::map<std::string, std::string> tableAliasToName;
         for (auto& table_pair: tablesToProcess) {
@@ -263,9 +264,10 @@ void ExecuteSFWQuery(
             string table_alias = table_pair.second;
             tableNameToAlias[table_name] = table_alias;
             tableAliasToName[table_alias] = table_name;
-            tableReaderWriterLookUpMap[table_name] = findTableReaderWriter(allTableReaderWriters, allBPlusReaderWriters, table_name);
-            tableReaderWriterWithPrefixLookUpMap[table_name] = std::make_shared<MyDB_TableReaderWriter>(tableReaderWriterLookUpMap[table_name]);
-            tableReaderWriterWithPrefixLookUpMap[table_name]->getTable()->getSchema()->addPrefix(table_alias);
+            tableReaderWriterLookUpMap[table_alias] = findTableReaderWriter(allTableReaderWriters, allBPlusReaderWriters, table_name);
+            tableReaderWriterWithPrefixLookUpMap[table_alias] = std::make_shared<MyDB_TableReaderWriter>(tableReaderWriterLookUpMap[table_alias]);
+            tableReaderWriterWithPrefixLookUpMap[table_alias]->getTable()->getSchema()->addPrefix(table_alias);
+            joinedTableOriginalAlias[table_alias].insert(table_alias);
         }
 
         // find all attrs needed
@@ -277,7 +279,7 @@ void ExecuteSFWQuery(
             for (auto& aliasAttPair : valueAtts) {
                 string tableAlias = aliasAttPair.first;
                 string tableAtts = aliasAttPair.second;
-                tableProjectionRequirement[tableAliasToName[tableAlias]].insert(tableAlias + "_" + tableAtts);
+                tableProjectionRequirement[tableAlias].insert(tableAlias + "_" + tableAtts);
             }
         }
         // attrs in where
@@ -286,7 +288,7 @@ void ExecuteSFWQuery(
             for (auto& aliasAttPair : valueAtts) {
                 string tableAlias = aliasAttPair.first;
                 string tableAtts = aliasAttPair.second;
-                tableProjectionRequirement[tableAliasToName[tableAlias]].insert(tableAlias + "_" + tableAtts);
+                tableProjectionRequirement[tableAlias].insert(tableAlias + "_" + tableAtts);
             }
         }
         // attrs in group by
@@ -295,7 +297,7 @@ void ExecuteSFWQuery(
             for (auto& aliasAttPair : valueAtts) {
                 string tableAlias = aliasAttPair.first;
                 string tableAtts = aliasAttPair.second;
-                tableProjectionRequirement[tableAliasToName[tableAlias]].insert(tableAlias + "_" + tableAtts);
+                tableProjectionRequirement[tableAlias].insert(tableAlias + "_" + tableAtts);
             }
         }
 
@@ -304,7 +306,7 @@ void ExecuteSFWQuery(
 
         
         std::list<TableEdge> tableEdgeList;   // graph representation of tables and their join connctions
-        //TO DO: first do the selection on the smaller table (might can make it smaller and fit into the cache)
+        //first do the selection on the smaller table (might can make it smaller and fit into the cache)
         // for each table, it needs to join 
         // start to join: equalityChecks        
         for (ExprTreePtr disjunction: allDisjunctions) {
@@ -331,17 +333,14 @@ void ExecuteSFWQuery(
                     // For all possible case leftAtts.size() == 1 && rightAtts.size() == 1
                     string lAlias = leftAtts[0].first;
                     string rAlias = rightAtts[0].first;
-                    string ltable = tableAliasToName[lAlias];
-                    string rtable = tableAliasToName[rAlias];
  
-
                     bool edgeFound = false;
                     for (TableEdge& edge : tableEdgeList) {
-                        if (edge.ltable == ltable && edge.rtable == rtable) { // find edge, add equalityChecks
+                        if (edge.lalias == lAlias && edge.ralias == rAlias) { // find edge, add equalityChecks
                             edgeFound = true;
                             edge.equalityChecks.push_back(std::make_pair(lhs, rhs));
                             break;
-                        } else if (edge.ltable == rtable && edge.rtable == ltable) {
+                        } else if (edge.lalias == rAlias && edge.ralias == lAlias) {
                             edge.equalityChecks.push_back(std::make_pair(rhs, lhs));
                             edgeFound = true;
                             break;
@@ -350,11 +349,7 @@ void ExecuteSFWQuery(
                     if (!edgeFound) { // not in the current edges, add it to the vector
                         std::vector<std::pair<ExprTreePtr, ExprTreePtr>> equalityCheckVec;
                         equalityCheckVec.push_back(std::make_pair(lhs, rhs));
-                        std::set<string> ltables;
-                        ltables.insert(ltable);
-                        std::set<string> rtables;
-                        rtables.insert(rtable);
-                        tableEdgeList.push_back({ltable, rtable, equalityCheckVec, ltables, rtables});
+                        tableEdgeList.push_back({lAlias, rAlias, equalityCheckVec});
                     }
                 } 
             } 
@@ -362,14 +357,57 @@ void ExecuteSFWQuery(
                 auto disjunctionAtts = disjunction->getIdentifiers();
                 DisjunctionPrerequests prerequests;
                 for (auto& disjunctionAtt: disjunctionAtts) {
-                    prerequests.insert(tableAliasToName[disjunctionAtt.first]);
+                    prerequests.insert(disjunctionAtt.first);
                 } 
                 nonEqualityCheckDisjunctions.push_back(std::make_pair(disjunction, prerequests));
             }
         }
 
-        int tableCount = tablesToProcess.size();
+        //  start from table 0
+        //  in a while loop, find all reachable node of the initialNode table
+        //  add empty edge from the initialNode table to the first unreachable node
+        //  end loop if all tables are reachable
+        string initialNode = tablesToProcess[0].second;
+        int reachableCount = 1;
+        while (reachableCount < tablesToProcess.size()) {
+            std::queue<string> nodeQueue;
+            std::set<string> reachNodeThisRound;
+            reachNodeThisRound.insert(initialNode);
+            nodeQueue.push(initialNode);
+            while (!nodeQueue.empty()) {
+                string nodeToVisit = nodeQueue.front();
+                nodeQueue.pop();
+                for (auto& edge : tableEdgeList) {
+                    if (
+                        edge.lalias == nodeToVisit && 
+                        reachNodeThisRound.find(edge.ralias) == reachNodeThisRound.end()) 
+                    {
+                        reachNodeThisRound.insert(edge.ralias);
+                        nodeQueue.push(edge.ralias);
+                    } else if (
+                        edge.ralias == nodeToVisit &&
+                        reachNodeThisRound.find(edge.lalias) == reachNodeThisRound.end()) {
+                        reachNodeThisRound.insert(edge.lalias);
+                        nodeQueue.push(edge.lalias);
+                    }
+                }
+            }
+            reachableCount = reachNodeThisRound.size();
+            if (reachableCount >= tablesToProcess.size()) break;
+            for (auto tableInfo : tablesToProcess) {
+                string tableAlias = tableInfo.second;
+                if (reachNodeThisRound.find(tableAlias) == reachNodeThisRound.end()) {
+                    tableEdgeList.push_back({initialNode, tableAlias, std::vector<std::pair<ExprTreePtr, ExprTreePtr>>()});
+                    reachableCount++;
+                    break;
+                }
+               
+            }
+        }
 
+
+        int tableCount = tablesToProcess.size();
+        int joinTableIdx = 0;
         // keep join until we only have one table
         while (tableCount > 1) {
             auto edge = tableEdgeList.begin();
@@ -384,25 +422,28 @@ void ExecuteSFWQuery(
                 }
             }
             // then join bestEdge
-            auto ltableReaderWriter = tableReaderWriterWithPrefixLookUpMap[bestEdge->ltable]; // leftInput of join
-            auto rtableReaderWriter = tableReaderWriterWithPrefixLookUpMap[bestEdge->rtable]; // rightInput of join
+            auto ltableReaderWriter = tableReaderWriterWithPrefixLookUpMap[bestEdge->lalias]; // leftInput of join
+            auto rtableReaderWriter = tableReaderWriterWithPrefixLookUpMap[bestEdge->ralias]; // rightInput of join
 
 
             // create output schema for join & prepare projections
             vector <string> projections;
             MyDB_SchemaPtr join_output_schema = make_shared<MyDB_Schema>();
             
+            set<string> outputProjectionRequirement;
             // ltable
-            for (auto& attName: tableProjectionRequirement[bestEdge->ltable]) {
+            for (auto& attName: tableProjectionRequirement[bestEdge->lalias]) {
                 MyDB_AttTypePtr attType = ltableReaderWriter->getTable()->getSchema()->getAttByName(attName).second;
                 join_output_schema->appendAtt(std::make_pair(attName, attType));
                 projections.push_back("[" + attName + "]");
+                outputProjectionRequirement.insert(attName);
             }
             // rtable
-            for (auto& attName: tableProjectionRequirement[bestEdge->rtable]) {
+            for (auto& attName: tableProjectionRequirement[bestEdge->ralias]) {
                 MyDB_AttTypePtr attType = rtableReaderWriter->getTable()->getSchema()->getAttByName(attName).second;
                 join_output_schema->appendAtt(std::make_pair(attName, attType));
                 projections.push_back("[" + attName + "]");
+                outputProjectionRequirement.insert(attName);
             }
             {
                 std::stringstream ss;
@@ -419,7 +460,8 @@ void ExecuteSFWQuery(
                 DisjunctionPrerequests disjunctionPrerequests = disjunction->second;
                 bool allPrerequestFound = true;
                 for (auto& prerequest: disjunctionPrerequests) {
-                    if (bestEdge->leftTables.find(prerequest) == bestEdge->leftTables.end()) {
+                    auto& leftTableAlias = joinedTableOriginalAlias[bestEdge->lalias];
+                    if (leftTableAlias.find(prerequest) == leftTableAlias.end()) {
                         allPrerequestFound = false;
                         break;
                     }
@@ -438,7 +480,8 @@ void ExecuteSFWQuery(
                 DisjunctionPrerequests disjunctionPrerequests = disjunction->second;
                 bool allPrerequestFound = true;
                 for (auto& prerequest: disjunctionPrerequests) {
-                    if (bestEdge->rightTables.find(prerequest) == bestEdge->rightTables.end()) {
+                    auto& rightTableAlias = joinedTableOriginalAlias[bestEdge->ralias];
+                    if (rightTableAlias.find(prerequest) == rightTableAlias.end()) {
                         allPrerequestFound = false;
                         break;
                     }
@@ -449,7 +492,7 @@ void ExecuteSFWQuery(
                 }
             }
 
-            // prepare  finalSelectionPredicate, rightSelectionPredicate
+            // prepare finalSelectionPredicate
             string finalSelectionPredicate = "bool[True]";
             for (auto disjunction = nonEqualityCheckDisjunctions.begin(); disjunction != nonEqualityCheckDisjunctions.end(); ++disjunction) 
             {
@@ -457,9 +500,11 @@ void ExecuteSFWQuery(
                 DisjunctionPrerequests disjunctionPrerequests = disjunction->second;
                 bool allPrerequestFound = true;
                 for (auto& prerequest: disjunctionPrerequests) {
+                    auto& leftTableAlias = joinedTableOriginalAlias[bestEdge->lalias];
+                    auto& rightTableAlias = joinedTableOriginalAlias[bestEdge->ralias];
                     if (
-                        bestEdge->rightTables.find(prerequest) == bestEdge->rightTables.end() ||
-                        bestEdge->leftTables.find(prerequest) == bestEdge->leftTables.end()
+                        leftTableAlias.find(prerequest) == leftTableAlias.end() &&
+                        rightTableAlias.find(prerequest) == rightTableAlias.end()
                     ) {
                         allPrerequestFound = false;
                         break;
@@ -471,19 +516,94 @@ void ExecuteSFWQuery(
                 }
             }
 
-            // TO DO: equalityChecks: exprtreeptr->string()
+            // equalityChecks: exprtreeptr->string()
             vector <pair <string, string>> equalityChecksForJoin;
-            for (TableEdge& edge : tableEdgeList) {
-                for(auto eqCheck : edge.equalityChecks){
-                    equalityChecksForJoin.push_back(std::make_pair(eqCheck.first->toString(), eqCheck.second->toString()));
+            for(auto eqCheck : bestEdge->equalityChecks){
+                equalityChecksForJoin.push_back(std::make_pair(eqCheck.first->toString(), eqCheck.second->toString()));
+            }
+
+            joinTableIdx++;
+            string joinOutputTableAlias = "TempJoinOutput" + to_string(joinTableIdx);
+            
+            auto joinOutputTable = std::make_shared<MyDB_TableReaderWriter>(std::make_shared<MyDB_Table>(joinOutputTableAlias, joinOutputTableAlias, join_output_schema), bufferMgr);
+            // add new table to tableReaderWriterWithPrefixLookUpMap
+            tableReaderWriterWithPrefixLookUpMap[joinOutputTableAlias] = joinOutputTable;
+
+            
+            // run join
+            ScanJoin scanJoin(
+                ltableReaderWriter,
+                rtableReaderWriter,
+                joinOutputTable,
+                finalSelectionPredicate,
+                projections,
+                equalityChecksForJoin,
+                leftSelectionPredicate,
+                rightSelectionPredicate
+            );
+            scanJoin.run();
+
+            {
+                cout << joinOutputTableAlias << std::endl;
+                MyDB_RecordPtr tempRec = joinOutputTable->getEmptyRecord();
+                MyDB_RecordIteratorAltPtr myIter = joinOutputTable->getIteratorAlt();
+
+                while (myIter->advance()) {
+                    myIter->getCurrent(tempRec);
+                    cout << tempRec << "\n";
                 }
             }
             
-            // TO DO: run join
-            //ScanJoin scanJoin();
-            // TO DO: remove selected edge, iterate through edgelist, update all edges containing node in selected edge
-            // TO DO: update tableProjectionRequirement for new table
-            // TO DO: add new table to tableReaderWriterWithPrefixLookUpMap
+            // update tableProjectionRequirement for new table
+            tableProjectionRequirement[joinOutputTableAlias] = outputProjectionRequirement;
+
+            // remove selected edge, iterate through edgelist, update all edges containing node in selected edge
+            set<string> originalAliasInOutput = joinedTableOriginalAlias[bestEdge->lalias];
+            for (auto& alias : joinedTableOriginalAlias[bestEdge->ralias]) {
+                originalAliasInOutput.insert(alias);
+            }
+            joinedTableOriginalAlias[joinOutputTableAlias] = originalAliasInOutput;
+            for (auto edgeIter = tableEdgeList.begin(); edgeIter != tableEdgeList.end(); ++edgeIter) {
+                if (edgeIter != bestEdge) {
+                    if (edgeIter->lalias == bestEdge->lalias || edgeIter->lalias == bestEdge->ralias) {
+                        edgeIter->lalias = joinOutputTableAlias;
+                    } else if (edgeIter->ralias == bestEdge->lalias || edgeIter->ralias == bestEdge->ralias) {
+                        edgeIter->ralias = joinOutputTableAlias;
+                    }
+                }
+
+            }
+
+            tableEdgeList.erase(bestEdge);
+            // after deleting edges in a cycle, two edges might coincide with each other, need to delete one of them
+            
+            for (auto edgeIter1 = tableEdgeList.begin(); edgeIter1 != tableEdgeList.end(); ++edgeIter1) {
+                for (auto edgeIter2 = std::next(edgeIter1); edgeIter2!= tableEdgeList.end(); ++edgeIter2) {
+                    if ((edgeIter1->lalias == edgeIter2->lalias && edgeIter1->ralias == edgeIter2->ralias)) {
+                        edgeIter1->equalityChecks.insert(
+                            edgeIter1->equalityChecks.end(),
+                            edgeIter2->equalityChecks.begin(),
+                            edgeIter2->equalityChecks.end()
+                        );
+                        tableEdgeList.erase(edgeIter2++);
+                    } else if (edgeIter1->lalias == edgeIter2->ralias && edgeIter1->ralias == edgeIter2->lalias) {
+                        // merge 2 coincided edges (equalityChecks)
+                        for (auto& eqChecks : edgeIter2->equalityChecks) {
+                            edgeIter1->equalityChecks.push_back(
+                                std::make_pair(eqChecks.second, eqChecks.first));
+                        }
+                        tableEdgeList.erase(edgeIter2++);
+                    }
+                }
+            }
+            
+
+            
+
+            
+            
+            
+            
 
             /*
             ScanJoin (MyDB_TableReaderWriterPtr leftInput, MyDB_TableReaderWriterPtr rightInput,
@@ -499,9 +619,16 @@ void ExecuteSFWQuery(
             // TO DO if use estimiatedOutputSize: set DistinctValues for output table after one join;
         }
         // TO DO: do selection
+        string lastJoinOutputTableAlias = "TempJoinOutput" + to_string(joinTableIdx);
+        auto lastJoinOutput = tableReaderWriterWithPrefixLookUpMap[lastJoinOutputTableAlias];
+        {
+            MyDB_RecordPtr tempRec = lastJoinOutput->getEmptyRecord();
+            MyDB_RecordIteratorAltPtr myIter = lastJoinOutput->getIteratorAlt();
 
-        
-
-        
-    }
+            while (myIter->advance()) {
+                myIter->getCurrent(tempRec);
+                cout << tempRec << "\n";
+            }
+        }
+    }    
 }
